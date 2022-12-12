@@ -7,7 +7,8 @@ setup(
     author='Massimo De Agro',
     author_email='massimo.deagro@gmail.com',
     # Needed for dependencies
-    install_requires=['numpy', 'opencv-python', 'trimesh', 'tqdm', 'pandas'],
+    install_requires=['numpy', 'opencv-python', 'trimesh', 'tqdm', 'pandas',
+                      'scipy', 'networkx', 'pytables', 'matplotlib'],
     # *strongly* suggested for sharing
     version='0.3',
     # The license can be anything you like

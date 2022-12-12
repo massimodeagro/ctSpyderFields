@@ -9,6 +9,10 @@ import pandas as pd #to work with tables
 import numpy as np #deals with matrix and arrays
 import os #looks into files and folder paths
 
+### PLOTTING
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+
 class UnrecognizedEye(Exception):
     pass
 
@@ -54,6 +58,7 @@ class Eye:
         self.RotatedRetinaPoints = None
         self.RotatedLensCloud = None
         self.RotatedRetinaCloud = None
+        self.RotatedLensSphere = None
 
         self.StandardOrientationLensPoints = None
         self.StandardOrientationRetinaPoints = None
@@ -62,6 +67,8 @@ class Eye:
 
         self.StandardOrientationProjectedVectors = []
         self.StandardOrientationProjectedVectorsFull = []
+        self.focalLengths = []
+        self.focalLengthsFull = []
 
 
     def amira_find_lens_points(self, labels_pictures_list):
@@ -129,11 +136,11 @@ class Eye:
         self.RotatedRetinaCloud = trimesh.points.PointCloud(self.RotatedRetinaPoints)
 
     def find_split_plane(self):
-        '''
+        """
         this function finds the plane (xy, xz, yz) that divides retina from lens,
         as well as on which side of the two is the retina and on which is the lens.
         This is needed for finding the cap of the lens.
-        '''
+        """
 
         LensSpanX = (max(self.RotatedLensCloud.vertices[:, 0]),
                      min(self.RotatedLensCloud.vertices[:, 0]))
@@ -171,7 +178,7 @@ class Eye:
                     mask = (self.RotatedLensCloud.convex_hull.vertices[:, 2] < 0)
             self.RotatedLensSurfacePoints = self.RotatedLensCloud.convex_hull.vertices[mask, :]
         else:
-            print('cry')
+            print('cry') #TODO: do a better error catching process
             pass
 
     def sphere_fit(self, point_cloud):
@@ -215,10 +222,17 @@ class Eye:
         return (radius, sphere_center)
 
     def find_lens_sphere(self):
+        """
+        helper function, call the two previous formulas to do everything in one step
+        """
         self.find_split_plane()
         self.RotatedLensSphere = self.sphere_fit(self.RotatedLensSurfacePoints)
 
     def rotate_back(self):
+        """
+        rotate the sphere back to the original frame of reference
+        """
+
         rotationMatrix = np.linalg.inv(self.LensCloud.convex_hull.principal_inertia_transform)
 
         self.LensSphere = (self.RotatedLensSphere[0], trimesh.transform_points([self.RotatedLensSphere[1]], rotationMatrix)[0])
@@ -231,32 +245,32 @@ class Eye:
         self.StandardOrientationLensSphere = (self.LensSphere[0], trimesh.transform_points([self.LensSphere[1]], rotationMatrix)[0])
 
     def project_retina(self, visual_field_radius):
-        for point in tqdm(self.StandardOrientationRetinaCloud.convex_hull.vertices, desc='projecting '+self.EyeIdentity+' retina'):
-            sx = self.StandardOrientationLensSphere[1][0]
-            sy = self.StandardOrientationLensSphere[1][1]
-            sz = self.StandardOrientationLensSphere[1][2]
+        sx = self.StandardOrientationLensSphere[1][0]
+        sy = self.StandardOrientationLensSphere[1][1]
+        sz = self.StandardOrientationLensSphere[1][2]
 
+        for point in tqdm(self.StandardOrientationRetinaCloud.convex_hull.vertices, desc='projecting '+self.EyeIdentity+' retina'):
             rx = point[0]
             ry = point[1]
             rz = point[2]
-            v = (sx-rx, sy-ry,sz-rz)
+            v = (sx-rx, sy-ry, sz-rz)
             vmag = np.sqrt(v[0]**2 + v[1]**2 + v[2]**2)
             vu = (v[0]/vmag, v[1]/vmag, v[2]/vmag)
 
             """Ray/sphere intersection, from https://gist.github.com/thegedge/4769985"""
-            vuflip = np.multiply(vu,-1) #I have no idea why, but data is wrong with the vector as calculated above, needs to be pointing in the other direction
+            vuflip = np.multiply(vu, -1) #I have no idea why, but data is wrong with the vector as calculated above, needs to be pointing in the other direction
             r=visual_field_radius
             dDotR0 = np.dot(vuflip, point)
             t = -dDotR0 - (dDotR0 * dDotR0 - np.dot(point, point) + r * r) ** 0.5
 
             self.StandardOrientationProjectedVectors.append([point, vuflip, (point[0] + t * vuflip[0], point[1] + t * vuflip[1], point[2] + t * vuflip[2])])
+            self.focalLengths.append([point, vmag])
 
     def project_retina_full(self, visual_field_radius):
+        sx = self.StandardOrientationLensSphere[1][0]
+        sy = self.StandardOrientationLensSphere[1][1]
+        sz = self.StandardOrientationLensSphere[1][2]
         for point in tqdm(self.StandardOrientationRetinaCloud.vertices, desc='projecting '+self.EyeIdentity+' retina'):
-            sx = self.StandardOrientationLensSphere[1][0]
-            sy = self.StandardOrientationLensSphere[1][1]
-            sz = self.StandardOrientationLensSphere[1][2]
-
             rx = point[0]
             ry = point[1]
             rz = point[2]
@@ -271,7 +285,7 @@ class Eye:
             t = -dDotR0 - (dDotR0 * dDotR0 - np.dot(point, point) + r * r) ** 0.5
 
             self.StandardOrientationProjectedVectorsFull.append([point, vuflip, (point[0] + t * vuflip[0], point[1] + t * vuflip[1], point[2] + t * vuflip[2])])
-        self.StandardOrientationProjectedVectorsFullDownsampled = trimesh.PointCloud(np.array(self.StandardOrientationProjectedVectorsFull)[:,2]).convex_hull.vertices
+            self.focalLengthsFull.append([point, vmag])
 
 
 class Spider:
@@ -429,8 +443,8 @@ class Spider:
         self.ALE.orientToStandard(rotationMatrix)
         self.PME.orientToStandard(rotationMatrix)
         self.PLE.orientToStandard(rotationMatrix)
-        for point in self.cephalothoraxMarkers:
-            self.StandardOrientationCephalothoraxPoints[point] = trimesh.transform_points([self.cephalothoraxMarkers[point]],rotationMatrix)[0]
+        for marker in self.cephalothoraxMarkers:
+            self.StandardOrientationCephalothoraxPoints[marker] = trimesh.transform_points([self.cephalothoraxMarkers[marker]], rotationMatrix)[0]
 
     def project_retinas(self, field_mm):
         self.AME.project_retina(field_mm/self.voxelSize)
@@ -453,7 +467,7 @@ class Spider:
 
         print('Saving data...')
         ## Coordinates
-        data = {'AME':{'Lens': {'Original': self.AME.LensPoints,
+        data = {'AME': {'Lens': {'Original': self.AME.LensPoints,
                                'Rotated': self.AME.RotatedLensPoints,
                                'Standard': self.AME.StandardOrientationLensPoints},
                        'Retina': {'Original': self.AME.RetinaPoints,
@@ -570,7 +584,71 @@ class Spider:
         self.PLE.StandardOrientationRetinaCloud = trimesh.points.PointCloud(self.PLE.StandardOrientationRetinaPoints)
         
         self.cephalothoraxMarkers = data['cephalothorax']['Original']
+        points = []
+        for marker in self.cephalothoraxMarkers:
+            points.append(self.cephalothoraxMarkers[marker])
+        self.cephalothoraxCloud = trimesh.points.PointCloud(points)
         self.StandardOrientationCephalothoraxPoints = data['cephalothorax']['Rotated']
 
         print('Loaded...')
+    
+    def plot(self, eyes=('AME', 'ALE', 'PME', 'PLE'), elements=('lens', 'retina', 'projection', 'projection_full'), alpha=1):
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.set_box_aspect([1, 1, 1])
+        if 'AME' in eyes and 'AME' in self.available_eyes:
+            if 'lens' in elements:
+                lens =self.AME.StandardOrientationLensCloud.convex_hull.vertices
+                ax.scatter(lens[:, 0], lens[:, 1], lens[:, 2], color='purple')
+            if 'retina' in elements:
+                retina = self.AME.StandardOrientationRetinaCloud.convex_hull.vertices
+                ax.scatter(retina[:, 0], retina[:, 1], retina[:, 2], color='purple')
+            if 'projection' in elements:
+                Project = np.array(self.AME.StandardOrientationProjectedVectors)[:, 2]
+                ax.scatter(Project[:, 0], Project[:, 1], Project[:, 2], color='indigo', alpha=alpha)
+            if 'projection_full' in elements:
+                Project = np.array(self.AME.StandardOrientationProjectedVectorsFull)[:, 2]
+                ax.scatter(Project[:, 0], Project[:, 1], Project[:, 2], color='indigo', alpha=alpha)
+        if 'ALE' in eyes and 'ALE' in self.available_eyes:
+            if 'lens' in elements:
+                lens =self.ALE.StandardOrientationLensCloud.convex_hull.vertices
+                ax.scatter(lens[:, 0], lens[:, 1], lens[:, 2], color='green')
+            if 'retina' in elements:
+                retina = self.ALE.StandardOrientationRetinaCloud.convex_hull.vertices
+                ax.scatter(retina[:, 0], retina[:, 1], retina[:, 2], color='green')
+            if 'projection' in elements:
+                Project = np.array(self.ALE.StandardOrientationProjectedVectors)[:, 2]
+                ax.scatter(Project[:, 0], Project[:, 1], Project[:, 2], color='darkgreen', alpha=alpha)
+            if 'projection_full' in elements:
+                Project = np.array(self.ALE.StandardOrientationProjectedVectorsFull)[:, 2]
+                ax.scatter(Project[:, 0], Project[:, 1], Project[:, 2], color='darkgreen', alpha=alpha)
+        if 'PME' in eyes and 'PME' in self.available_eyes:
+            if 'lens' in elements:
+                lens =self.PME.StandardOrientationLensCloud.convex_hull.vertices
+                ax.scatter(lens[:, 0], lens[:, 1], lens[:, 2], color='goldenrod')
+            if 'retina' in elements:
+                retina = self.PME.StandardOrientationRetinaCloud.convex_hull.vertices
+                ax.scatter(retina[:, 0], retina[:, 1], retina[:, 2], color='goldenrod')
+            if 'projection' in elements:
+                Project = np.array(self.PME.StandardOrientationProjectedVectors)[:, 2]
+                ax.scatter(Project[:, 0], Project[:, 1], Project[:, 2], color='darkgoldenrod', alpha=alpha)
+            if 'projection_full' in elements:
+                Project = np.array(self.PME.StandardOrientationProjectedVectorsFull)[:, 2]
+                ax.scatter(Project[:, 0], Project[:, 1], Project[:, 2], color='darkgoldenrod', alpha=alpha)
+        if 'PLE' in eyes and 'PLE' in self.available_eyes:
+            if 'lens' in elements:
+                lens =self.PLE.StandardOrientationLensCloud.convex_hull.vertices
+                ax.scatter(lens[:, 0], lens[:, 1], lens[:, 2], color='darkred')
+            if 'retina' in elements:
+                retina = self.PLE.StandardOrientationRetinaCloud.convex_hull.vertices
+                ax.scatter(retina[:, 0], retina[:, 1], retina[:, 2], color='darkred')
+            if 'projection' in elements:
+                Project = np.array(self.PLE.StandardOrientationProjectedVectors)[:, 2]
+                ax.scatter(Project[:, 0], Project[:, 1], Project[:, 2], color='maroon', alpha=alpha)
+            if 'projection_full' in elements:
+                Project = np.array(self.PLE.StandardOrientationProjectedVectorsFull)[:, 2]
+                ax.scatter(Project[:, 0], Project[:, 1], Project[:, 2], color='maroon', alpha=alpha)
+
+        plt.show()
+
         

@@ -23,4 +23,5 @@ PhilaeusChrysops.compute_cephalothorax()
 PhilaeusChrysops.dragonfly_find_eyes_points()
 PhilaeusChrysops.compute_eyes()
 PhilaeusChrysops.orient_to_standard()
-PhilaeusChrysops.project_retinas(150)
+
+PhilaeusChrysops.project_retinas(field_mm=150)

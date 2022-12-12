@@ -6,7 +6,7 @@ import cv2
 from ctSpyderFields import ctSpyderFields
 import numpy as np
 
-
+#TODO redo the read from amira
 
 path = 'C:/Users/lauren.sumner-rooney/Documents/DragonflyProjects/DragonflyExport/VisualFieldFinder/Philaeus-chrysops/'
 phillabelnames = {'AME':{'Lens':'Philaeus_chrysops-Lenses-AME', 'Retina':'Philaeus_chrysops-Retinas-AME'},

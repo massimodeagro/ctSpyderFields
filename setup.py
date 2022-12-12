@@ -12,7 +12,7 @@ setup(
     version='0.3',
     # The license can be anything you like
     license='GNU',
-    description='Pithon package that project retinas through lenses as segmented from micro CT scans (Amira, Dragonfly) of spiders.',
+    description='Python package that project retinas through lenses as segmented from micro CT scans (Amira, Dragonfly) of spiders.',
     # We will also need a readme eventually (there will be a warning)
     # long_description=open('README.txt').read(),
 )

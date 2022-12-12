@@ -1,23 +1,26 @@
+## Image processing
 import cv2 #computer vision 2, reads images
-import os #looks into files and folder paths
-import numpy as np #deals with matrix and arrays
-from mpl_toolkits import mplot3d #to plot in 3d
-import matplotlib.pyplot as plt #to generally plot
-from tqdm import tqdm #to show percentage bars
-import pickle
-import pandas as pd
+import trimesh #to do 3d geometry
 
-import trimesh
-from scipy.spatial import ConvexHull
-from scipy.spatial.distance import cdist, euclidean
-from skspatial.objects import Plane, Points
-from skspatial.plotting import plot_3d
+### Tools
+from tqdm import tqdm #to show percentage bars
+import pickle #to save compressed files
+import pandas as pd #to work with tables
+import numpy as np #deals with matrix and arrays
+import os #looks into files and folder paths
 
 class UnrecognizedEye(Exception):
     pass
 
 class Eye:
+    """
+    This class is responsible for doing operations and containing
+    all the data for each eye
+    """
     def __init__(self, eye_identity: str):
+        """
+        :param eye_identity: one of AME, ALE, PME, PLE
+        """
         ## Standardized Data
         self.EyeIdentity = eye_identity
         if self.EyeIdentity == 'AME':
@@ -102,11 +105,11 @@ class Eye:
             self.RetinaPoints = np.argwhere(np.array(piclist) > 0)
 
     def define_lens_cloud(self):
-        print('finding '+ self.EyeIdentity+' lens Hull...')
+        print('finding ' + self.EyeIdentity+' lens Hull...')
         self.LensCloud = trimesh.points.PointCloud(self.LensPoints)
 
     def define_retina_cloud(self):
-        print('finding '+ self.EyeIdentity+' retina Hull...')
+        print('finding ' + self.EyeIdentity+' retina Hull...')
         self.RetinaCloud = trimesh.points.PointCloud(self.RetinaPoints)
 
     def define_all_clouds(self):
@@ -114,6 +117,10 @@ class Eye:
         self.define_retina_cloud()
 
     def align_to_zero(self):
+        """
+        This formula rotates both the retina points and the lens points according to the rotation-translation
+        matrix found by pointcloud of retina, in order to align everything to the standard axis
+        """
         rotationMatrix = self.LensCloud.convex_hull.principal_inertia_transform
 
         self.RotatedLensPoints = trimesh.transform_points(self.LensPoints, rotationMatrix)
@@ -268,15 +275,33 @@ class Eye:
 
 
 class Spider:
-    def __init__(self, path, dragonfly_label_names=None, voxelsize=0.001):
-        self.voxelSize = voxelsize
-        self.path = path
-        self.AME = Eye(eye_identity='AME')
-        self.ALE = Eye(eye_identity='ALE')
-        self.PME = Eye(eye_identity='PME')
-        self.PLE = Eye(eye_identity='PLE')
+    """
+    This class creates a spider object. this does the full computation and it is the only one you need to use
+    the rest is called from here
+    """
+    def __init__(self, workdir, dragonfly_label_names=None, voxelsize=0.001, available_eyes: list = ['AME', 'ALE', 'PME','PLE']):
+        """
+        explain here all self
 
-        self.cephalothoraxPoints = {'center':[],
+        :param workdir: directory where all the files of the focus spider exist and ONLY those
+        :param dragonfly_label_names: not required. specify the filenames for dragonfly different binary images
+        :param voxelsize: how many points for mm
+        """
+        self.voxelSize = voxelsize
+        self.path = workdir
+        self.available_eyes = available_eyes
+
+        #TODO: implement this in all the other formulas
+        if 'AME' in self.available_eyes:
+            self.AME = Eye(eye_identity='AME')
+        if 'ALE' in self.available_eyes:
+            self.ALE = Eye(eye_identity='ALE')
+        if 'PME' in self.available_eyes:
+            self.PME = Eye(eye_identity='PME')
+        if 'PLE' in self.available_eyes:
+            self.PLE = Eye(eye_identity='PLE')
+
+        self.cephalothoraxMarkers = {'center':[],
                                     'front':[], 'back':[],
                                     'bottom':[], 'top':[],
                                     'left':[], 'right':[]}
@@ -307,6 +332,13 @@ class Spider:
         self.PLE.amira_find_all_points(self.AmiraLabelPictures)
 
     def dragonfly_load_label(self, labelname, group, object):
+        """
+        This function pull all the pngs from workdir and load them according to file names
+        provided in self.DragonflyLabelNames
+        :param labelname: the name of label as provided in self.DragonflyLabelNames
+        :param group: can be either an eye or marker
+        :param object: lens, retina or one of the 7 markers
+        """
         allpics = os.listdir(self.path)
         imagelist = []
         for file in allpics:
@@ -316,27 +348,41 @@ class Spider:
             self.DragonflyLabelPictures[group][object].append(cv2.imread(self.path + file, 0))
 
     def dragonfly_load_all_labels(self):
-        for eye in ['AME', 'ALE', 'PME', 'PLE']:
+        '''
+        This function calls dragonfly_load_label for 4 + 7 times
+        '''
+        for eye in self.available_eyes:
             for label in self.DragonflyLabelNames[eye]:
                 self.dragonfly_load_label(labelname=self.DragonflyLabelNames[eye][label],group=eye,object=label)
         for marker in self.DragonflyLabelPictures['Markers']:
             self.dragonfly_load_label(labelname=self.DragonflyLabelNames['Markers'][marker], group='Markers', object=marker)
 
     def dragonfly_find_eyes_points(self):
-        print('finding AME points...')
-        self.AME.dragonfly_find_points(piclist=self.DragonflyLabelPictures['AME']['Lens'], part='Lens')
-        self.AME.dragonfly_find_points(piclist=self.DragonflyLabelPictures['AME']['Retina'], part='Retina')
-        print('finding ALE points...')
-        self.ALE.dragonfly_find_points(piclist=self.DragonflyLabelPictures['ALE']['Lens'], part='Lens')
-        self.ALE.dragonfly_find_points(piclist=self.DragonflyLabelPictures['ALE']['Retina'], part='Retina')
-        print('finding PME points...')
-        self.PME.dragonfly_find_points(piclist=self.DragonflyLabelPictures['PME']['Lens'], part='Lens')
-        self.PME.dragonfly_find_points(piclist=self.DragonflyLabelPictures['PME']['Retina'], part='Retina')
-        print('finding PLE points...')
-        self.PLE.dragonfly_find_points(piclist=self.DragonflyLabelPictures['PLE']['Lens'], part='Lens')
-        self.PLE.dragonfly_find_points(piclist=self.DragonflyLabelPictures['PLE']['Retina'], part='Retina')
+        '''
+        helper function to find all eyes at once. to see how points are found, look in class eyes, function dragonfly_find_points
+        '''
+        if 'AME' in self.available_eyes:
+            print('finding AME points...')
+            self.AME.dragonfly_find_points(piclist=self.DragonflyLabelPictures['AME']['Lens'], part='Lens')
+            self.AME.dragonfly_find_points(piclist=self.DragonflyLabelPictures['AME']['Retina'], part='Retina')
+        if 'ALE' in self.available_eyes:
+            print('finding ALE points...')
+            self.ALE.dragonfly_find_points(piclist=self.DragonflyLabelPictures['ALE']['Lens'], part='Lens')
+            self.ALE.dragonfly_find_points(piclist=self.DragonflyLabelPictures['ALE']['Retina'], part='Retina')
+        if 'PME' in self.available_eyes:
+            print('finding PME points...')
+            self.PME.dragonfly_find_points(piclist=self.DragonflyLabelPictures['PME']['Lens'], part='Lens')
+            self.PME.dragonfly_find_points(piclist=self.DragonflyLabelPictures['PME']['Retina'], part='Retina')
+        if 'PLE' in self.available_eyes:
+            print('finding PLE points...')
+            self.PLE.dragonfly_find_points(piclist=self.DragonflyLabelPictures['PLE']['Lens'], part='Lens')
+            self.PLE.dragonfly_find_points(piclist=self.DragonflyLabelPictures['PLE']['Retina'], part='Retina')
 
     def compute_eye(self, eye):
+        '''
+        helper function to do all the required computation for each eye. look into class eye for each single function
+        :param eye: eye identity. can be AME, ALE, PME, PLE
+        '''
         if eye == 'AME':
             self.AME.define_all_clouds()
             self.AME.align_to_zero()
@@ -359,18 +405,22 @@ class Spider:
             self.PLE.rotate_back()
 
     def compute_eyes(self):
-        self.compute_eye('AME')
-        self.compute_eye('ALE')
-        self.compute_eye('PME')
-        self.compute_eye('PLE')
+        '''
+        run this! compute all eyes together
+        '''
+        for eye in self.available_eyes:
+            self.compute_eye(eye)
 
     def compute_cephalothorax(self):
+        '''
+        this first translates the binary pictures in a set of points, and then find the center
+        '''
         allpoints = []
-        for point in self.cephalothoraxPoints:
-            print('finding '+point+' points...')
-            dots = np.argwhere(np.array(self.DragonflyLabelPictures['Markers'][point]) > 0)
-            self.cephalothoraxPoints[point] = (np.mean(dots[:,0]),np.mean(dots[:,1]),np.mean(dots[:,2]))
-            allpoints.append(self.cephalothoraxPoints[point])
+        for marker in self.cephalothoraxMarkers:
+            print('finding '+marker+' points...')
+            dots = np.argwhere(np.array(self.DragonflyLabelPictures['Markers'][marker]) > 0)
+            self.cephalothoraxMarkers[marker] = (np.mean(dots[:,0]),np.mean(dots[:,1]),np.mean(dots[:,2]))
+            allpoints.append(self.cephalothoraxMarkers[marker])
         self.cephalothoraxCloud = trimesh.points.PointCloud(allpoints)
 
     def orient_to_standard(self):
@@ -379,8 +429,8 @@ class Spider:
         self.ALE.orientToStandard(rotationMatrix)
         self.PME.orientToStandard(rotationMatrix)
         self.PLE.orientToStandard(rotationMatrix)
-        for point in self.cephalothoraxPoints:
-            self.StandardOrientationCephalothoraxPoints[point] = trimesh.transform_points([self.cephalothoraxPoints[point]],rotationMatrix)[0]
+        for point in self.cephalothoraxMarkers:
+            self.StandardOrientationCephalothoraxPoints[point] = trimesh.transform_points([self.cephalothoraxMarkers[point]],rotationMatrix)[0]
 
     def project_retinas(self, field_mm):
         self.AME.project_retina(field_mm/self.voxelSize)
@@ -435,7 +485,7 @@ class Spider:
                                    'Standard': self.PLE.StandardOrientationRetinaPoints},
                         'Projection': {'Surface': self.PLE.StandardOrientationProjectedVectors,
                                        'Full': self.PLE.StandardOrientationProjectedVectorsFull}},
-                'cephalothorax':{'Original': self.cephalothoraxPoints,
+                'cephalothorax':{'Original': self.cephalothoraxMarkers,
                                  'Rotated': self.StandardOrientationCephalothoraxPoints}}
         if type=='h5':
             tab = pd.DataFrame(data)
@@ -519,7 +569,7 @@ class Spider:
         self.PLE.RotatedRetinaCloud = trimesh.points.PointCloud(self.PLE.RotatedRetinaPoints)
         self.PLE.StandardOrientationRetinaCloud = trimesh.points.PointCloud(self.PLE.StandardOrientationRetinaPoints)
         
-        self.cephalothoraxPoints = data['cephalothorax']['Original']
+        self.cephalothoraxMarkers = data['cephalothorax']['Original']
         self.StandardOrientationCephalothoraxPoints = data['cephalothorax']['Rotated']
 
         print('Loaded...')

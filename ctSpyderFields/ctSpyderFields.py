@@ -245,6 +245,7 @@ class Eye:
         self.StandardOrientationLensSphere = (self.LensSphere[0], trimesh.transform_points([self.LensSphere[1]], rotationMatrix)[0])
 
     def project_retina(self, visual_field_radius):
+        self.StandardOrientationProjectedVectors = []
         sx = self.StandardOrientationLensSphere[1][0]
         sy = self.StandardOrientationLensSphere[1][1]
         sz = self.StandardOrientationLensSphere[1][2]
@@ -267,6 +268,7 @@ class Eye:
             self.focalLengths.append([point, vmag])
 
     def project_retina_full(self, visual_field_radius):
+        self.StandardOrientationProjectedVectorsFull = []
         sx = self.StandardOrientationLensSphere[1][0]
         sy = self.StandardOrientationLensSphere[1][1]
         sz = self.StandardOrientationLensSphere[1][2]

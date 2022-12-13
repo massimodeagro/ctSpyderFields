@@ -16,6 +16,9 @@ from mpl_toolkits.mplot3d import Axes3D
 class UnrecognizedEye(Exception):
     pass
 
+class WrongCommand(Exception):
+    pass
+
 class Eye:
     """
     This class is responsible for doing operations and containing
@@ -69,6 +72,7 @@ class Eye:
         self.StandardOrientationProjectedVectorsFull = []
         self.focalLengths = []
         self.focalLengthsFull = []
+        self.FOVcontourPoints = None
 
 
     def amira_find_lens_points(self, labels_pictures_list):
@@ -289,6 +293,69 @@ class Eye:
             self.StandardOrientationProjectedVectorsFull.append([point, vuflip, (point[0] + t * vuflip[0], point[1] + t * vuflip[1], point[2] + t * vuflip[2])])
             self.focalLengthsFull.append([point, vmag])
 
+    def plane_slicer(self, plane, face, stepsize, tolerance):
+        points = np.array(self.StandardOrientationProjectedVectorsFull)[:, 2]
+        if plane == 'XY':
+            perpendicular_axis = 2
+            slicing_directions = [0, 1]
+            span_directions = [1, 0]
+        elif plane == 'XZ':
+            perpendicular_axis = 1
+            slicing_directions = [0, 2]
+            span_directions = [2, 0]
+        elif plane == 'YZ':
+            perpendicular_axis = 0
+            slicing_directions = [1, 2]
+            span_directions = [2, 1]
+        else:
+            raise
+        if face == 'front':
+            toselect = points[:, perpendicular_axis] > 0
+            selectedpoints = points[toselect]
+        elif face == 'back':
+            toselect = points[:, perpendicular_axis] < 0
+            selectedpoints = points[toselect]
+        else:
+            raise
+
+        if len(selectedpoints) > 0:
+            maxs = []
+            mins = []
+            for slicing_dir, span_dir in zip(slicing_directions, span_directions):
+                span = np.arange(min(selectedpoints[:, slicing_dir]) - 1, max(selectedpoints[:, slicing_dir] + 1),
+                                 stepsize)
+                for start, end in tqdm(zip(span[:-1], span[1:])):
+                    toslice = np.multiply(selectedpoints[:, slicing_dir] > start, selectedpoints[:, slicing_dir] < end)
+                    slice = selectedpoints[toslice]
+                    if len(slice) > 0:
+                        sliceMax = slice[slice[:, span_dir] == max(slice[:, span_dir])][0]
+                        sliceMin = slice[slice[:, span_dir] == min(slice[:, span_dir])][0]
+                        if not -tolerance < sliceMax[perpendicular_axis] < tolerance:
+                            maxs.append(sliceMax)
+                        if not -tolerance < sliceMin[perpendicular_axis] < tolerance:
+                            mins.append(sliceMin)
+            maxs = np.array(maxs)
+            mins = np.array(mins)
+
+            return maxs, mins
+        else:
+            return [], []
+    def find_field_contours(self, stepsize, tolerance):
+        XYf = self.plane_slicer(plane='XY', face='front', stepsize=stepsize, tolerance=tolerance)
+        XYb = self.plane_slicer(plane='XY', face='back', stepsize=stepsize, tolerance=tolerance)
+        XZf = self.plane_slicer(plane='XZ', face='front', stepsize=stepsize, tolerance=tolerance)
+        XZb = self.plane_slicer(plane='XZ', face='back', stepsize=stepsize, tolerance=tolerance)
+        YZf = self.plane_slicer(plane='YZ', face='front', stepsize=stepsize, tolerance=tolerance)
+        YZb = self.plane_slicer(plane='YZ', face='back', stepsize=stepsize, tolerance=tolerance)
+
+        tomerge = []
+        for face in [XYf, XYb, XZf, XZb, YZf, YZb]:
+            if len(face) > 0:
+                for side in face:
+                    if len(side) > 0:
+                        tomerge.append(side)
+        self.FOVcontourPoints = np.unique(np.concatenate(tomerge), axis=0)
+
 
 class Spider:
     """
@@ -460,6 +527,23 @@ class Spider:
         self.PME.project_retina_full(field_mm/self.voxelSize)
         self.PLE.project_retina_full(field_mm/self.voxelSize)
 
+    def find_all_fields_contours(self, stepsizes=(500,500,500,500), tolerances=(500,500,500,500)):
+        '''
+
+        :param stepsizes: the size of slices in each direction in pixels. Always need to be a 4 long list, even with less eyes
+        :param tolerances: the span from 0 from where to remove points found as contour, they probably are just plane edges
+        :return:
+        '''
+        if 'AME' in self.available_eyes:
+            self.AME.find_field_contours(stepsizes[0], tolerances[0])
+        if 'ALE' in self.available_eyes:
+            self.ALE.find_field_contours(stepsizes[1], tolerances[1])
+        if 'PME' in self.available_eyes:
+            self.PME.find_field_contours(stepsizes[2], tolerances[2])
+        if 'PLE' in self.available_eyes:
+            self.PLE.find_field_contours(stepsizes[3], tolerances[3])
+
+
     def save(self, filename, type='pickle'):
         '''
         :param filename: not including extension
@@ -501,7 +585,7 @@ class Spider:
                                    'Standard': self.PLE.StandardOrientationRetinaPoints},
                         'Projection': {'Surface': self.PLE.StandardOrientationProjectedVectors,
                                        'Full': self.PLE.StandardOrientationProjectedVectorsFull}},
-                'cephalothorax':{'Original': self.cephalothoraxMarkers,
+                'cephalothorax': {'Original': self.cephalothoraxMarkers,
                                  'Rotated': self.StandardOrientationCephalothoraxPoints}}
         if type=='h5':
             tab = pd.DataFrame(data)
@@ -532,14 +616,14 @@ class Spider:
         self.AME.RotatedRetinaPoints = data['AME']['Retina']['Rotated']
         self.AME.StandardOrientationRetinaPoints = data['AME']['Retina']['Standard']
         self.AME.StandardOrientationProjectedVectors = data['AME']['Projection']['Surface']
-        self.AME.StandardOrientationProjectedVectorsFull = data['AME']['Projection']['Full']  
+        self.AME.StandardOrientationProjectedVectorsFull = data['AME']['Projection']['Full']
         self.AME.LensCloud = trimesh.points.PointCloud(self.AME.LensPoints)
         self.AME.RotatedLensCloud = trimesh.points.PointCloud(self.AME.RotatedLensPoints)
         self.AME.StandardOrientationLensCloud = trimesh.points.PointCloud(self.AME.StandardOrientationLensPoints)
         self.AME.RetinaCloud = trimesh.points.PointCloud(self.AME.RetinaPoints)
         self.AME.RotatedRetinaCloud = trimesh.points.PointCloud(self.AME.RotatedRetinaPoints)
         self.AME.StandardOrientationRetinaCloud = trimesh.points.PointCloud(self.AME.StandardOrientationRetinaPoints)
-        
+
         self.ALE.LensPoints = data['ALE']['Lens']['Original']
         self.ALE.RotatedLensPoints = data['ALE']['Lens']['Rotated']
         self.ALE.StandardOrientationLensPoints = data['ALE']['Lens']['Standard']
@@ -554,7 +638,7 @@ class Spider:
         self.ALE.RetinaCloud = trimesh.points.PointCloud(self.ALE.RetinaPoints)
         self.ALE.RotatedRetinaCloud = trimesh.points.PointCloud(self.ALE.RotatedRetinaPoints)
         self.ALE.StandardOrientationRetinaCloud = trimesh.points.PointCloud(self.ALE.StandardOrientationRetinaPoints)
-        
+
         self.PME.LensPoints = data['PME']['Lens']['Original']
         self.PME.RotatedLensPoints = data['PME']['Lens']['Rotated']
         self.PME.StandardOrientationLensPoints = data['PME']['Lens']['Standard']
@@ -569,7 +653,7 @@ class Spider:
         self.PME.RetinaCloud = trimesh.points.PointCloud(self.PME.RetinaPoints)
         self.PME.RotatedRetinaCloud = trimesh.points.PointCloud(self.PME.RotatedRetinaPoints)
         self.PME.StandardOrientationRetinaCloud = trimesh.points.PointCloud(self.PME.StandardOrientationRetinaPoints)
-        
+
         self.PLE.LensPoints = data['PLE']['Lens']['Original']
         self.PLE.RotatedLensPoints = data['PLE']['Lens']['Rotated']
         self.PLE.StandardOrientationLensPoints = data['PLE']['Lens']['Standard']
@@ -584,7 +668,7 @@ class Spider:
         self.PLE.RetinaCloud = trimesh.points.PointCloud(self.PLE.RetinaPoints)
         self.PLE.RotatedRetinaCloud = trimesh.points.PointCloud(self.PLE.RotatedRetinaPoints)
         self.PLE.StandardOrientationRetinaCloud = trimesh.points.PointCloud(self.PLE.StandardOrientationRetinaPoints)
-        
+
         self.cephalothoraxMarkers = data['cephalothorax']['Original']
         points = []
         for marker in self.cephalothoraxMarkers:
@@ -593,8 +677,10 @@ class Spider:
         self.StandardOrientationCephalothoraxPoints = data['cephalothorax']['Rotated']
 
         print('Loaded...')
-    
-    def plot(self, eyes=('AME', 'ALE', 'PME', 'PLE'), elements=('lens', 'retina', 'projection', 'projection_full'), alpha=1):
+
+    def plot(self, eyes=('AME', 'ALE', 'PME', 'PLE'),
+             elements=('lens', 'retina', 'projection', 'projection_full', 'FOVoutline'),
+             plot_FOV_sphere=True, field_mm=150, alpha=1):
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         ax.set_box_aspect([1, 1, 1])
@@ -611,6 +697,9 @@ class Spider:
             if 'projection_full' in elements:
                 Project = np.array(self.AME.StandardOrientationProjectedVectorsFull)[:, 2]
                 ax.scatter(Project[:, 0], Project[:, 1], Project[:, 2], color='indigo', alpha=alpha)
+            if 'FOVoutline' in elements:
+                Outline = self.AME.FOVcontourPoints
+                ax.scatter(Outline[:, 0], Outline[:, 1], Outline[:, 2], color='indigo', alpha=alpha)
         if 'ALE' in eyes and 'ALE' in self.available_eyes:
             if 'lens' in elements:
                 lens =self.ALE.StandardOrientationLensCloud.convex_hull.vertices
@@ -624,6 +713,9 @@ class Spider:
             if 'projection_full' in elements:
                 Project = np.array(self.ALE.StandardOrientationProjectedVectorsFull)[:, 2]
                 ax.scatter(Project[:, 0], Project[:, 1], Project[:, 2], color='darkgreen', alpha=alpha)
+            if 'FOVoutline' in elements:
+                Outline = self.ALE.FOVcontourPoints
+                ax.scatter(Outline[:, 0], Outline[:, 1], Outline[:, 2], color='darkgreen', alpha=alpha)
         if 'PME' in eyes and 'PME' in self.available_eyes:
             if 'lens' in elements:
                 lens =self.PME.StandardOrientationLensCloud.convex_hull.vertices
@@ -637,6 +729,9 @@ class Spider:
             if 'projection_full' in elements:
                 Project = np.array(self.PME.StandardOrientationProjectedVectorsFull)[:, 2]
                 ax.scatter(Project[:, 0], Project[:, 1], Project[:, 2], color='darkgoldenrod', alpha=alpha)
+            if 'FOVoutline' in elements:
+                Outline = self.PME.FOVcontourPoints
+                ax.scatter(Outline[:, 0], Outline[:, 1], Outline[:, 2], color='darkgoldenrod', alpha=alpha)
         if 'PLE' in eyes and 'PLE' in self.available_eyes:
             if 'lens' in elements:
                 lens =self.PLE.StandardOrientationLensCloud.convex_hull.vertices
@@ -650,6 +745,16 @@ class Spider:
             if 'projection_full' in elements:
                 Project = np.array(self.PLE.StandardOrientationProjectedVectorsFull)[:, 2]
                 ax.scatter(Project[:, 0], Project[:, 1], Project[:, 2], color='maroon', alpha=alpha)
+            if 'FOVoutline' in elements:
+                Outline = self.PLE.FOVcontourPoints
+                ax.scatter(Outline[:, 0], Outline[:, 1], Outline[:, 2], color='maroon', alpha=alpha)
+        if plot_FOV_sphere:
+            u, v = np.mgrid[0:2 * np.pi:50j, 0:np.pi:50j]
+            x = int(field_mm/self.voxelSize) * np.cos(u) * np.sin(v)
+            y = int(field_mm/self.voxelSize) * np.sin(u) * np.sin(v)
+            z = int(field_mm/self.voxelSize) * np.cos(v)
+
+            ax.plot_wireframe(x, y, z, linewidth=0.50, color='black')
 
         plt.show()
 

@@ -12,10 +12,21 @@ import os  # looks into files and folder paths
 ### PLOTTING
 import matplotlib.pyplot as plt
 
+### Colors ###
+colors = {
+    "red":          [255, 0, 0],
+    "green":        [0, 255, 0],
+    "blue":         [0, 0, 255],
+    "magenta":      [255, 0, 255],
+    "purple":       [130, 0, 130],
+    "dark_green":   [0, 130, 0],
+    "teal_blue":    [0, 130, 130],
+    "dark_blue":    [0, 0, 130]
+}
+
 ### Exceptions ###
 class UnrecognizedEye(Exception):
     pass
-
 
 class WrongCommand(Exception):
     pass
@@ -23,7 +34,7 @@ class WrongCommand(Exception):
 class InvalidDataset(Exception):
     pass
 
-
+### Classes ###
 class Eye:
     """
     This class is responsible for doing operations and containing
@@ -49,7 +60,7 @@ class Eye:
             LensColor = (np.array([0, 0, 250]), np.array([0, 0, 256]))
             RetinaColor = (np.array([0, 0, 110]), np.array([0, 0, 130]))
         else:
-            raise UnrecognizedEye("you inputted the wrong eye name, abort.")
+            raise UnrecognizedEye("You inputted the wrong eye name, abort.")
         self.LensColor = LensColor
         self.RetinaColor = RetinaColor
 
@@ -455,7 +466,6 @@ class Eye:
                     if len(side) > 0:
                         tomerge.append(side)
         self.FOVcontourPoints = np.unique(np.concatenate(tomerge), axis=0)
-
 
 class Spider:
     """

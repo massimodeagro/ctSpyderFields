@@ -480,20 +480,10 @@ class Spider:
         self.path = workdir
         self.available_eyes = available_eyes
 
-        # TODO: implement this in all the other formulas
-        # self.eyes = {}
-        # for eye in self.available_eyes:
-        #     self.eyes[eye] = Eye(eye_identity=eye)
-
-        ## OLD version
-        if "AME" in self.available_eyes:
-            self.AME = Eye(eye_identity="AME")
-        if "ALE" in self.available_eyes:
-            self.ALE = Eye(eye_identity="ALE")
-        if "PME" in self.available_eyes:
-            self.PME = Eye(eye_identity="PME")
-        if "PLE" in self.available_eyes:
-            self.PLE = Eye(eye_identity="PLE")
+        ## New Version with a Dictionary
+        self.eyes = {}
+        for eye in self.available_eyes:
+            self.eyes[eye] = Eye(eye_identity=eye)
 
         self.cephalothoraxMarkers = {
             "center": [],
@@ -504,6 +494,7 @@ class Spider:
             "left": [],
             "right": [],
         }
+        
         self.StandardOrientationCephalothoraxPoints = {
             "center": [],
             "front": [],
@@ -516,6 +507,7 @@ class Spider:
 
         self.AmiraLabelPictures = []
         self.DragonflyLabelNames = dragonfly_label_names
+
         self.DragonflyLabelPictures = {
             "AME": {"Lens": [], "Retina": []},
             "ALE": {"Lens": [], "Retina": []},
@@ -537,10 +529,9 @@ class Spider:
             self.AmiraLabelPictures.append(cv2.imread(self.path + file, 1))
 
     def amira_find_all_points(self):
-        self.AME.amira_find_all_points(self.AmiraLabelPictures)
-        self.ALE.amira_find_all_points(self.AmiraLabelPictures)
-        self.PME.amira_find_all_points(self.AmiraLabelPictures)
-        self.PLE.amira_find_all_points(self.AmiraLabelPictures)
+        # Find Lens and Retina Points for each eye
+        for eye in self.available_eyes:
+            self.eyes[eye].amira_find_all_points(self.AmiraLabelPictures)
 
     def dragonfly_load_label(self, labelname, group, object):
         """
@@ -582,64 +573,24 @@ class Spider:
         """
         helper function to find all eyes at once. to see how points are found, look in class eyes, function dragonfly_find_points
         """
-        if "AME" in self.available_eyes:
-            print("finding AME points...")
-            self.AME.dragonfly_find_points(
-                piclist=self.DragonflyLabelPictures["AME"]["Lens"], part="Lens"
-            )
-            self.AME.dragonfly_find_points(
-                piclist=self.DragonflyLabelPictures["AME"]["Retina"], part="Retina"
-            )
-        if "ALE" in self.available_eyes:
-            print("finding ALE points...")
-            self.ALE.dragonfly_find_points(
-                piclist=self.DragonflyLabelPictures["ALE"]["Lens"], part="Lens"
-            )
-            self.ALE.dragonfly_find_points(
-                piclist=self.DragonflyLabelPictures["ALE"]["Retina"], part="Retina"
-            )
-        if "PME" in self.available_eyes:
-            print("finding PME points...")
-            self.PME.dragonfly_find_points(
-                piclist=self.DragonflyLabelPictures["PME"]["Lens"], part="Lens"
-            )
-            self.PME.dragonfly_find_points(
-                piclist=self.DragonflyLabelPictures["PME"]["Retina"], part="Retina"
-            )
-        if "PLE" in self.available_eyes:
-            print("finding PLE points...")
-            self.PLE.dragonfly_find_points(
-                piclist=self.DragonflyLabelPictures["PLE"]["Lens"], part="Lens"
-            )
-            self.PLE.dragonfly_find_points(
-                piclist=self.DragonflyLabelPictures["PLE"]["Retina"], part="Retina"
-            )
+        # Find Points DragonFly for each eye
+        for eye in self.available_eyes:
+            print("finding " + eye + " points...")
+            for blob in ["Lens", "Retina"]:
+                self.eyes[eye].dragonfly_find_points(piclist=self.DragonflyLabelPictures[eye][blob], part=blob)
 
     def compute_eye(self, eye):
         """
         helper function to do all the required computation for each eye. look into class eye for each single function
         :param eye: eye identity. can be AME, ALE, PME, PLE
         """
-        if eye == "AME":
-            self.AME.define_all_clouds()
-            self.AME.align_to_zero()
-            self.AME.find_lens_sphere()
-            self.AME.rotate_back()
-        elif eye == "ALE":
-            self.ALE.define_all_clouds()
-            self.ALE.align_to_zero()
-            self.ALE.find_lens_sphere()
-            self.ALE.rotate_back()
-        elif eye == "PME":
-            self.PME.define_all_clouds()
-            self.PME.align_to_zero()
-            self.PME.find_lens_sphere()
-            self.PME.rotate_back()
-        elif eye == "PLE":
-            self.PLE.define_all_clouds()
-            self.PLE.align_to_zero()
-            self.PLE.find_lens_sphere()
-            self.PLE.rotate_back()
+        if eye in self.available_eyes:
+            self.eyes[eye].define_all_clouds()
+            self.eyes[eye].align_to_zero()
+            self.eyes[eye].find_lens_sphere()
+            self.eyes[eye].rotate_back()
+        else:
+            raise(UnrecognizedEye("Unrecognized Eye: Computation aborted."))
 
     def compute_eyes(self):
         """
@@ -647,13 +598,8 @@ class Spider:
         """
         print('Computing lenses and retina geometries...', end='')
         for eye in self.available_eyes:
-            #self.eyes[eye].define_all_clouds()
-            #self.eyes[eye].align_to_zero()
-            #self.eyes[eye].find_lens_sphere()
-            #self.eyes[eye].rotate_back()
             self.compute_eye(eye)
         print(' Done')
-
 
     def compute_cephalothorax(self):
         """
@@ -675,10 +621,11 @@ class Spider:
 
     def orient_to_standard(self):
         rotationMatrix = self.cephalothoraxCloud.convex_hull.principal_inertia_transform
-        self.AME.orientToStandard(rotationMatrix)
-        self.ALE.orientToStandard(rotationMatrix)
-        self.PME.orientToStandard(rotationMatrix)
-        self.PLE.orientToStandard(rotationMatrix)
+
+        # Rotate each eye
+        for eye in self.available_eyes:
+            self.eyes[eye].orientToStandard(rotationMatrix)
+
         for marker in self.cephalothoraxMarkers:
             self.StandardOrientationCephalothoraxPoints[
                 marker
@@ -689,16 +636,14 @@ class Spider:
             ]
 
     def project_retinas(self, field_mm):
-        self.AME.project_retina(field_mm / self.voxelSize)
-        self.ALE.project_retina(field_mm / self.voxelSize)
-        self.PME.project_retina(field_mm / self.voxelSize)
-        self.PLE.project_retina(field_mm / self.voxelSize)
+        # Project each retina
+        for eye in self.available_eyes:
+            self.eyes[eye].project_retina(field_mm / self.voxelSize)
 
     def project_retinas_full(self, field_mm):
-        self.AME.project_retina_full(field_mm / self.voxelSize)
-        self.ALE.project_retina_full(field_mm / self.voxelSize)
-        self.PME.project_retina_full(field_mm / self.voxelSize)
-        self.PLE.project_retina_full(field_mm / self.voxelSize)
+        # Project each retina
+        for eye in self.available_eyes:
+            self.eyes[eye].project_retina_full(field_mm / self.voxelSize)
 
     def find_all_fields_contours(
         self, stepsizes=(500, 500, 500, 500), tolerances=(500, 500, 500, 500)
@@ -710,14 +655,9 @@ class Spider:
         :return:
         """
         print("Finding fields of view contours...", end="")
-        if "AME" in self.available_eyes:
-            self.AME.find_field_contours(stepsizes[0], tolerances[0])
-        if "ALE" in self.available_eyes:
-            self.ALE.find_field_contours(stepsizes[1], tolerances[1])
-        if "PME" in self.available_eyes:
-            self.PME.find_field_contours(stepsizes[2], tolerances[2])
-        if "PLE" in self.available_eyes:
-            self.PLE.find_field_contours(stepsizes[3], tolerances[3])
+        for i in len(range(self.available_eyes)):
+            self.eyes[list(self.available_eyes)[i]].find_field_contours(stepsizes[i], tolerances[i])
+
         print(" Done")
 
     def save(self, filename, type="pickle"):

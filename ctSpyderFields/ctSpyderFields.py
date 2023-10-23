@@ -8,11 +8,9 @@ import pickle  # to save compressed files
 import pandas as pd  # to work with tables
 import numpy as np  # deals with matrix and arrays
 import os  # looks into files and folder paths
-from multiprocessing import Pool
 
 ### PLOTTING
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
 
 class UnrecognizedEye(Exception):
@@ -120,7 +118,7 @@ class Eye:
         self.amira_find_lens_points(labels_pictures_list)
         self.amira_find_retinas_points(labels_pictures_list)
 
-    def dragonfly_find_points(self, piclist, part="lens"):
+    def dragonfly_find_points(self, piclist, part="Lens"):
         if part == "Lens":
             self.LensPoints = np.argwhere(np.array(piclist) > 0)
         elif part == "Retina":

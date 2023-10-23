@@ -480,20 +480,10 @@ class Spider:
         self.path = workdir
         self.available_eyes = available_eyes
 
-        # TODO: implement this in all the other formulas
-        # self.eyes = {}
-        # for eye in self.available_eyes:
-        #     self.eyes[eye] = Eye(eye_identity=eye)
-
-        ## OLD version
-        if "AME" in self.available_eyes:
-            self.AME = Eye(eye_identity="AME")
-        if "ALE" in self.available_eyes:
-            self.ALE = Eye(eye_identity="ALE")
-        if "PME" in self.available_eyes:
-            self.PME = Eye(eye_identity="PME")
-        if "PLE" in self.available_eyes:
-            self.PLE = Eye(eye_identity="PLE")
+        ## New Version with a Dictionary
+        self.eyes = {}
+        for eye in self.available_eyes:
+            self.eyes[eye] = Eye(eye_identity=eye)
 
         self.cephalothoraxMarkers = {
             "center": [],
@@ -504,6 +494,7 @@ class Spider:
             "left": [],
             "right": [],
         }
+        
         self.StandardOrientationCephalothoraxPoints = {
             "center": [],
             "front": [],
@@ -516,6 +507,7 @@ class Spider:
 
         self.AmiraLabelPictures = []
         self.DragonflyLabelNames = dragonfly_label_names
+
         self.DragonflyLabelPictures = {
             "AME": {"Lens": [], "Retina": []},
             "ALE": {"Lens": [], "Retina": []},
@@ -537,10 +529,9 @@ class Spider:
             self.AmiraLabelPictures.append(cv2.imread(self.path + file, 1))
 
     def amira_find_all_points(self):
-        self.AME.amira_find_all_points(self.AmiraLabelPictures)
-        self.ALE.amira_find_all_points(self.AmiraLabelPictures)
-        self.PME.amira_find_all_points(self.AmiraLabelPictures)
-        self.PLE.amira_find_all_points(self.AmiraLabelPictures)
+        # Find Lens and Retina Points for each eye
+        for eye in self.available_eyes:
+            self.eyes[eye].amira_find_all_points(self.AmiraLabelPictures)
 
     def dragonfly_load_label(self, labelname, group, object):
         """
@@ -582,64 +573,24 @@ class Spider:
         """
         helper function to find all eyes at once. to see how points are found, look in class eyes, function dragonfly_find_points
         """
-        if "AME" in self.available_eyes:
-            print("finding AME points...")
-            self.AME.dragonfly_find_points(
-                piclist=self.DragonflyLabelPictures["AME"]["Lens"], part="Lens"
-            )
-            self.AME.dragonfly_find_points(
-                piclist=self.DragonflyLabelPictures["AME"]["Retina"], part="Retina"
-            )
-        if "ALE" in self.available_eyes:
-            print("finding ALE points...")
-            self.ALE.dragonfly_find_points(
-                piclist=self.DragonflyLabelPictures["ALE"]["Lens"], part="Lens"
-            )
-            self.ALE.dragonfly_find_points(
-                piclist=self.DragonflyLabelPictures["ALE"]["Retina"], part="Retina"
-            )
-        if "PME" in self.available_eyes:
-            print("finding PME points...")
-            self.PME.dragonfly_find_points(
-                piclist=self.DragonflyLabelPictures["PME"]["Lens"], part="Lens"
-            )
-            self.PME.dragonfly_find_points(
-                piclist=self.DragonflyLabelPictures["PME"]["Retina"], part="Retina"
-            )
-        if "PLE" in self.available_eyes:
-            print("finding PLE points...")
-            self.PLE.dragonfly_find_points(
-                piclist=self.DragonflyLabelPictures["PLE"]["Lens"], part="Lens"
-            )
-            self.PLE.dragonfly_find_points(
-                piclist=self.DragonflyLabelPictures["PLE"]["Retina"], part="Retina"
-            )
+        # Find Points DragonFly for each eye
+        for eye in self.available_eyes:
+            print("finding " + eye + " points...")
+            for blob in ["Lens", "Retina"]:
+                self.eyes[eye].dragonfly_find_points(piclist=self.DragonflyLabelPictures[eye][blob], part=blob)
 
     def compute_eye(self, eye):
         """
         helper function to do all the required computation for each eye. look into class eye for each single function
         :param eye: eye identity. can be AME, ALE, PME, PLE
         """
-        if eye == "AME":
-            self.AME.define_all_clouds()
-            self.AME.align_to_zero()
-            self.AME.find_lens_sphere()
-            self.AME.rotate_back()
-        elif eye == "ALE":
-            self.ALE.define_all_clouds()
-            self.ALE.align_to_zero()
-            self.ALE.find_lens_sphere()
-            self.ALE.rotate_back()
-        elif eye == "PME":
-            self.PME.define_all_clouds()
-            self.PME.align_to_zero()
-            self.PME.find_lens_sphere()
-            self.PME.rotate_back()
-        elif eye == "PLE":
-            self.PLE.define_all_clouds()
-            self.PLE.align_to_zero()
-            self.PLE.find_lens_sphere()
-            self.PLE.rotate_back()
+        if eye in self.available_eyes:
+            self.eyes[eye].define_all_clouds()
+            self.eyes[eye].align_to_zero()
+            self.eyes[eye].find_lens_sphere()
+            self.eyes[eye].rotate_back()
+        else:
+            raise(UnrecognizedEye("Unrecognized Eye: Computation aborted."))
 
     def compute_eyes(self):
         """
@@ -647,13 +598,8 @@ class Spider:
         """
         print('Computing lenses and retina geometries...', end='')
         for eye in self.available_eyes:
-            #self.eyes[eye].define_all_clouds()
-            #self.eyes[eye].align_to_zero()
-            #self.eyes[eye].find_lens_sphere()
-            #self.eyes[eye].rotate_back()
             self.compute_eye(eye)
         print(' Done')
-
 
     def compute_cephalothorax(self):
         """
@@ -675,10 +621,11 @@ class Spider:
 
     def orient_to_standard(self):
         rotationMatrix = self.cephalothoraxCloud.convex_hull.principal_inertia_transform
-        self.AME.orientToStandard(rotationMatrix)
-        self.ALE.orientToStandard(rotationMatrix)
-        self.PME.orientToStandard(rotationMatrix)
-        self.PLE.orientToStandard(rotationMatrix)
+
+        # Rotate each eye
+        for eye in self.available_eyes:
+            self.eyes[eye].orientToStandard(rotationMatrix)
+
         for marker in self.cephalothoraxMarkers:
             self.StandardOrientationCephalothoraxPoints[
                 marker
@@ -689,16 +636,14 @@ class Spider:
             ]
 
     def project_retinas(self, field_mm):
-        self.AME.project_retina(field_mm / self.voxelSize)
-        self.ALE.project_retina(field_mm / self.voxelSize)
-        self.PME.project_retina(field_mm / self.voxelSize)
-        self.PLE.project_retina(field_mm / self.voxelSize)
+        # Project each retina
+        for eye in self.available_eyes:
+            self.eyes[eye].project_retina(field_mm / self.voxelSize)
 
     def project_retinas_full(self, field_mm):
-        self.AME.project_retina_full(field_mm / self.voxelSize)
-        self.ALE.project_retina_full(field_mm / self.voxelSize)
-        self.PME.project_retina_full(field_mm / self.voxelSize)
-        self.PLE.project_retina_full(field_mm / self.voxelSize)
+        # Project each retina
+        for eye in self.available_eyes:
+            self.eyes[eye].project_retina_full(field_mm / self.voxelSize)
 
     def find_all_fields_contours(
         self, stepsizes=(500, 500, 500, 500), tolerances=(500, 500, 500, 500)
@@ -710,14 +655,9 @@ class Spider:
         :return:
         """
         print("Finding fields of view contours...", end="")
-        if "AME" in self.available_eyes:
-            self.AME.find_field_contours(stepsizes[0], tolerances[0])
-        if "ALE" in self.available_eyes:
-            self.ALE.find_field_contours(stepsizes[1], tolerances[1])
-        if "PME" in self.available_eyes:
-            self.PME.find_field_contours(stepsizes[2], tolerances[2])
-        if "PLE" in self.available_eyes:
-            self.PLE.find_field_contours(stepsizes[3], tolerances[3])
+        for i in range(len(self.available_eyes)):
+            self.eyes[list(self.available_eyes)[i]].find_field_contours(stepsizes[i], tolerances[i])
+
         print(" Done")
 
     def save(self, filename, type="pickle"):
@@ -732,66 +672,66 @@ class Spider:
         data = {
             "AME": {
                 "Lens": {
-                    "Original": self.AME.LensPoints,
-                    "Rotated": self.AME.RotatedLensPoints,
-                    "Standard": self.AME.StandardOrientationLensPoints,
+                    "Original": self.eyes["AME"].LensPoints,
+                    "Rotated": self.eyes["AME"].RotatedLensPoints,
+                    "Standard": self.eyes["AME"].StandardOrientationLensPoints,
                 },
                 "Retina": {
-                    "Original": self.AME.RetinaPoints,
-                    "Rotated": self.AME.RotatedRetinaPoints,
-                    "Standard": self.AME.StandardOrientationRetinaPoints,
+                    "Original": self.eyes["AME"].RetinaPoints,
+                    "Rotated": self.eyes["AME"].RotatedRetinaPoints,
+                    "Standard": self.eyes["AME"].StandardOrientationRetinaPoints,
                 },
                 "Projection": {
-                    "Surface": self.AME.StandardOrientationProjectedVectors,
-                    "Full": self.AME.StandardOrientationProjectedVectorsFull,
+                    "Surface": self.eyes["AME"].StandardOrientationProjectedVectors,
+                    "Full": self.eyes["AME"].StandardOrientationProjectedVectorsFull,
                 },
             },
             "ALE": {
                 "Lens": {
-                    "Original": self.ALE.LensPoints,
-                    "Rotated": self.ALE.RotatedLensPoints,
-                    "Standard": self.ALE.StandardOrientationLensPoints,
+                    "Original": self.eyes["ALE"].LensPoints,
+                    "Rotated":  self.eyes["ALE"].RotatedLensPoints,
+                    "Standard":  self.eyes["ALE"].StandardOrientationLensPoints,
                 },
                 "Retina": {
-                    "Original": self.ALE.RetinaPoints,
-                    "Rotated": self.ALE.RotatedRetinaPoints,
-                    "Standard": self.ALE.StandardOrientationRetinaPoints,
+                    "Original":  self.eyes["ALE"].RetinaPoints,
+                    "Rotated":  self.eyes["ALE"].RotatedRetinaPoints,
+                    "Standard":  self.eyes["ALE"].StandardOrientationRetinaPoints,
                 },
                 "Projection": {
-                    "Surface": self.ALE.StandardOrientationProjectedVectors,
-                    "Full": self.ALE.StandardOrientationProjectedVectorsFull,
+                    "Surface":  self.eyes["ALE"].StandardOrientationProjectedVectors,
+                    "Full":  self.eyes["ALE"].StandardOrientationProjectedVectorsFull,
                 },
             },
             "PME": {
                 "Lens": {
-                    "Original": self.PME.LensPoints,
-                    "Rotated": self.PME.RotatedLensPoints,
-                    "Standard": self.PME.StandardOrientationLensPoints,
+                    "Original": self.eyes["PME"].LensPoints,
+                    "Rotated": self.eyes["PME"].RotatedLensPoints,
+                    "Standard": self.eyes["PME"].StandardOrientationLensPoints,
                 },
                 "Retina": {
-                    "Original": self.PME.RetinaPoints,
-                    "Rotated": self.PME.RotatedRetinaPoints,
-                    "Standard": self.PME.StandardOrientationRetinaPoints,
+                    "Original": self.eyes["PME"].RetinaPoints,
+                    "Rotated": self.eyes["PME"].RotatedRetinaPoints,
+                    "Standard": self.eyes["PME"].StandardOrientationRetinaPoints,
                 },
                 "Projection": {
-                    "Surface": self.PME.StandardOrientationProjectedVectors,
-                    "Full": self.PME.StandardOrientationProjectedVectorsFull,
+                    "Surface": self.eyes["PME"].StandardOrientationProjectedVectors,
+                    "Full": self.eyes["PME"].StandardOrientationProjectedVectorsFull,
                 },
             },
             "PLE": {
                 "Lens": {
-                    "Original": self.PLE.LensPoints,
-                    "Rotated": self.PLE.RotatedLensPoints,
-                    "Standard": self.PLE.StandardOrientationLensPoints,
+                    "Original": self.eyes["PLE"].LensPoints,
+                    "Rotated": self.eyes["PLE"].RotatedLensPoints,
+                    "Standard": self.eyes["PLE"].StandardOrientationLensPoints,
                 },
                 "Retina": {
-                    "Original": self.PLE.RetinaPoints,
-                    "Rotated": self.PLE.RotatedRetinaPoints,
-                    "Standard": self.PLE.StandardOrientationRetinaPoints,
+                    "Original": self.eyes["PLE"].RetinaPoints,
+                    "Rotated": self.eyes["PLE"].RotatedRetinaPoints,
+                    "Standard": self.eyes["PLE"].StandardOrientationRetinaPoints,
                 },
                 "Projection": {
-                    "Surface": self.PLE.StandardOrientationProjectedVectors,
-                    "Full": self.PLE.StandardOrientationProjectedVectorsFull,
+                    "Surface": self.eyes["PLE"].StandardOrientationProjectedVectors,
+                    "Full": self.eyes["PLE"].StandardOrientationProjectedVectorsFull,
                 },
             },
             "cephalothorax": {
@@ -799,12 +739,16 @@ class Spider:
                 "Rotated": self.StandardOrientationCephalothoraxPoints,
             },
         }
+        
+        # Save into a file
         if type == "h5":
             tab = pd.DataFrame(data)
             tab.to_hdf(self.path + filename + ".h5", "tab")
         elif type == "pickle":
             with open(self.path + filename + ".pickle", "wb") as handle:
                 pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        else:
+            raise(InvalidDataset("Invalid extension. Saving process aborted."))
 
         print("Saved")
 
@@ -823,113 +767,21 @@ class Spider:
         else:
             raise InvalidDataset("Invalid extension " + type +  "of the file " + filename + " .")
 
-        self.AME.LensPoints = data["AME"]["Lens"]["Original"]
-        self.AME.RotatedLensPoints = data["AME"]["Lens"]["Rotated"]
-        self.AME.StandardOrientationLensPoints = data["AME"]["Lens"]["Standard"]
-        self.AME.RetinaPoints = data["AME"]["Retina"]["Original"]
-        self.AME.RotatedRetinaPoints = data["AME"]["Retina"]["Rotated"]
-        self.AME.StandardOrientationRetinaPoints = data["AME"]["Retina"]["Standard"]
-        self.AME.StandardOrientationProjectedVectors = data["AME"]["Projection"][
-            "Surface"
-        ]
-        self.AME.StandardOrientationProjectedVectorsFull = data["AME"]["Projection"][
-            "Full"
-        ]
-        self.AME.LensCloud = trimesh.points.PointCloud(self.AME.LensPoints)
-        self.AME.RotatedLensCloud = trimesh.points.PointCloud(
-            self.AME.RotatedLensPoints
-        )
-        self.AME.StandardOrientationLensCloud = trimesh.points.PointCloud(
-            self.AME.StandardOrientationLensPoints
-        )
-        self.AME.RetinaCloud = trimesh.points.PointCloud(self.AME.RetinaPoints)
-        self.AME.RotatedRetinaCloud = trimesh.points.PointCloud(
-            self.AME.RotatedRetinaPoints
-        )
-        self.AME.StandardOrientationRetinaCloud = trimesh.points.PointCloud(
-            self.AME.StandardOrientationRetinaPoints
-        )
-
-        self.ALE.LensPoints = data["ALE"]["Lens"]["Original"]
-        self.ALE.RotatedLensPoints = data["ALE"]["Lens"]["Rotated"]
-        self.ALE.StandardOrientationLensPoints = data["ALE"]["Lens"]["Standard"]
-        self.ALE.RetinaPoints = data["ALE"]["Retina"]["Original"]
-        self.ALE.RotatedRetinaPoints = data["ALE"]["Retina"]["Rotated"]
-        self.ALE.StandardOrientationRetinaPoints = data["ALE"]["Retina"]["Standard"]
-        self.ALE.StandardOrientationProjectedVectors = data["ALE"]["Projection"][
-            "Surface"
-        ]
-        self.ALE.StandardOrientationProjectedVectorsFull = data["ALE"]["Projection"][
-            "Full"
-        ]
-        self.ALE.LensCloud = trimesh.points.PointCloud(self.ALE.LensPoints)
-        self.ALE.RotatedLensCloud = trimesh.points.PointCloud(
-            self.ALE.RotatedLensPoints
-        )
-        self.ALE.StandardOrientationLensCloud = trimesh.points.PointCloud(
-            self.ALE.StandardOrientationLensPoints
-        )
-        self.ALE.RetinaCloud = trimesh.points.PointCloud(self.ALE.RetinaPoints)
-        self.ALE.RotatedRetinaCloud = trimesh.points.PointCloud(
-            self.ALE.RotatedRetinaPoints
-        )
-        self.ALE.StandardOrientationRetinaCloud = trimesh.points.PointCloud(
-            self.ALE.StandardOrientationRetinaPoints
-        )
-
-        self.PME.LensPoints = data["PME"]["Lens"]["Original"]
-        self.PME.RotatedLensPoints = data["PME"]["Lens"]["Rotated"]
-        self.PME.StandardOrientationLensPoints = data["PME"]["Lens"]["Standard"]
-        self.PME.RetinaPoints = data["PME"]["Retina"]["Original"]
-        self.PME.RotatedRetinaPoints = data["PME"]["Retina"]["Rotated"]
-        self.PME.StandardOrientationRetinaPoints = data["PME"]["Retina"]["Standard"]
-        self.PME.StandardOrientationProjectedVectors = data["PME"]["Projection"][
-            "Surface"
-        ]
-        self.PME.StandardOrientationProjectedVectorsFull = data["PME"]["Projection"][
-            "Full"
-        ]
-        self.PME.LensCloud = trimesh.points.PointCloud(self.PME.LensPoints)
-        self.PME.RotatedLensCloud = trimesh.points.PointCloud(
-            self.PME.RotatedLensPoints
-        )
-        self.PME.StandardOrientationLensCloud = trimesh.points.PointCloud(
-            self.PME.StandardOrientationLensPoints
-        )
-        self.PME.RetinaCloud = trimesh.points.PointCloud(self.PME.RetinaPoints)
-        self.PME.RotatedRetinaCloud = trimesh.points.PointCloud(
-            self.PME.RotatedRetinaPoints
-        )
-        self.PME.StandardOrientationRetinaCloud = trimesh.points.PointCloud(
-            self.PME.StandardOrientationRetinaPoints
-        )
-
-        self.PLE.LensPoints = data["PLE"]["Lens"]["Original"]
-        self.PLE.RotatedLensPoints = data["PLE"]["Lens"]["Rotated"]
-        self.PLE.StandardOrientationLensPoints = data["PLE"]["Lens"]["Standard"]
-        self.PLE.RetinaPoints = data["PLE"]["Retina"]["Original"]
-        self.PLE.RotatedRetinaPoints = data["PLE"]["Retina"]["Rotated"]
-        self.PLE.StandardOrientationRetinaPoints = data["PLE"]["Retina"]["Standard"]
-        self.PLE.StandardOrientationProjectedVectors = data["PLE"]["Projection"][
-            "Surface"
-        ]
-        self.PLE.StandardOrientationProjectedVectorsFull = data["PLE"]["Projection"][
-            "Full"
-        ]
-        self.PLE.LensCloud = trimesh.points.PointCloud(self.PLE.LensPoints)
-        self.PLE.RotatedLensCloud = trimesh.points.PointCloud(
-            self.PLE.RotatedLensPoints
-        )
-        self.PLE.StandardOrientationLensCloud = trimesh.points.PointCloud(
-            self.PLE.StandardOrientationLensPoints
-        )
-        self.PLE.RetinaCloud = trimesh.points.PointCloud(self.PLE.RetinaPoints)
-        self.PLE.RotatedRetinaCloud = trimesh.points.PointCloud(
-            self.PLE.RotatedRetinaPoints
-        )
-        self.PLE.StandardOrientationRetinaCloud = trimesh.points.PointCloud(
-            self.PLE.StandardOrientationRetinaPoints
-        )
+        for eye in self.available_eyes:
+            self.eyes[eye].LensPoints = data[eye]["Lens"]["Original"]
+            self.eyes[eye].RotatedLensPoints = data[eye]["Lens"]["Rotated"]
+            self.eyes[eye].StandardOrientationLensPoints = data[eye]["Lens"]["Standard"]
+            self.eyes[eye].RetinaPoints = data[eye]["Retina"]["Original"]
+            self.eyes[eye].RotatedRetinaPoints = data[eye]["Retina"]["Rotated"]
+            self.eyes[eye].StandardOrientationRetinaPoints = data[eye]["Retina"]["Standard"]
+            self.eyes[eye].StandardOrientationProjectedVectors = data[eye]["Projection"]["Surface"]
+            self.eyes[eye].StandardOrientationProjectedVectorsFull = data[eye]["Projection"]["Full"]
+            self.eyes[eye].LensCloud = trimesh.points.PointCloud(self.eyes[eye].LensPoints)
+            self.eyes[eye].RotatedLensCloud = trimesh.points.PointCloud(self.eyes[eye].RotatedLensPoints)
+            self.eyes[eye].StandardOrientationLensCloud = trimesh.points.PointCloud(self.eyes[eye].StandardOrientationLensPoints)
+            self.eyes[eye].RetinaCloud = trimesh.points.PointCloud(self.eyes[eye].RetinaPoints)
+            self.eyes[eye].RotatedRetinaCloud = trimesh.points.PointCloud(self.eyes[eye].RotatedRetinaPoints)
+            self.eyes[eye].StandardOrientationRetinaCloud = trimesh.points.PointCloud(self.eyes[eye].StandardOrientationRetinaPoints)
 
         self.cephalothoraxMarkers = data["cephalothorax"]["Original"]
         points = []
@@ -953,13 +805,13 @@ class Spider:
         ax.set_box_aspect([1, 1, 1])
         if "AME" in eyes and "AME" in self.available_eyes:
             if "lens" in elements:
-                lens = self.AME.StandardOrientationLensCloud.convex_hull.vertices
+                lens = self.eyes["AME"].StandardOrientationLensCloud.convex_hull.vertices
                 ax.scatter(lens[:, 0], lens[:, 1], lens[:, 2], color="purple")
             if "retina" in elements:
-                retina = self.AME.StandardOrientationRetinaCloud.convex_hull.vertices
+                retina = self.eyes["AME"].StandardOrientationRetinaCloud.convex_hull.vertices
                 ax.scatter(retina[:, 0], retina[:, 1], retina[:, 2], color="purple")
             if "projection" in elements:
-                Project = np.array(self.AME.StandardOrientationProjectedVectors)[:, 2]
+                Project = np.array(self.eyes["AME"].StandardOrientationProjectedVectors)[:, 2]
                 ax.scatter(
                     Project[:, 0],
                     Project[:, 1],
@@ -968,7 +820,7 @@ class Spider:
                     alpha=alpha,
                 )
             if "projection_full" in elements:
-                Project = np.array(self.AME.StandardOrientationProjectedVectorsFull)[
+                Project = np.array(self.eyes["AME"].StandardOrientationProjectedVectorsFull)[
                     :, 2
                 ]
                 ax.scatter(
@@ -979,7 +831,7 @@ class Spider:
                     alpha=alpha,
                 )
             if "FOVoutline" in elements:
-                Outline = self.AME.FOVcontourPoints
+                Outline = self.eyes["AME"].FOVcontourPoints
                 ax.scatter(
                     Outline[:, 0],
                     Outline[:, 1],
@@ -989,13 +841,13 @@ class Spider:
                 )
         if "ALE" in eyes and "ALE" in self.available_eyes:
             if "lens" in elements:
-                lens = self.ALE.StandardOrientationLensCloud.convex_hull.vertices
+                lens = self.eyes["ALE"].StandardOrientationLensCloud.convex_hull.vertices
                 ax.scatter(lens[:, 0], lens[:, 1], lens[:, 2], color="green")
             if "retina" in elements:
-                retina = self.ALE.StandardOrientationRetinaCloud.convex_hull.vertices
+                retina = self.eyes["ALE"].StandardOrientationRetinaCloud.convex_hull.vertices
                 ax.scatter(retina[:, 0], retina[:, 1], retina[:, 2], color="green")
             if "projection" in elements:
-                Project = np.array(self.ALE.StandardOrientationProjectedVectors)[:, 2]
+                Project = np.array(self.eyes["ALE"].StandardOrientationProjectedVectors)[:, 2]
                 ax.scatter(
                     Project[:, 0],
                     Project[:, 1],
@@ -1004,7 +856,7 @@ class Spider:
                     alpha=alpha,
                 )
             if "projection_full" in elements:
-                Project = np.array(self.ALE.StandardOrientationProjectedVectorsFull)[
+                Project = np.array(self.eyes["ALE"].StandardOrientationProjectedVectorsFull)[
                     :, 2
                 ]
                 ax.scatter(
@@ -1015,7 +867,7 @@ class Spider:
                     alpha=alpha,
                 )
             if "FOVoutline" in elements:
-                Outline = self.ALE.FOVcontourPoints
+                Outline = self.eyes["ALE"].FOVcontourPoints
                 ax.scatter(
                     Outline[:, 0],
                     Outline[:, 1],
@@ -1025,13 +877,13 @@ class Spider:
                 )
         if "PME" in eyes and "PME" in self.available_eyes:
             if "lens" in elements:
-                lens = self.PME.StandardOrientationLensCloud.convex_hull.vertices
+                lens = self.eyes["PME"].StandardOrientationLensCloud.convex_hull.vertices
                 ax.scatter(lens[:, 0], lens[:, 1], lens[:, 2], color="goldenrod")
             if "retina" in elements:
-                retina = self.PME.StandardOrientationRetinaCloud.convex_hull.vertices
+                retina = self.eyes["PME"].StandardOrientationRetinaCloud.convex_hull.vertices
                 ax.scatter(retina[:, 0], retina[:, 1], retina[:, 2], color="goldenrod")
             if "projection" in elements:
-                Project = np.array(self.PME.StandardOrientationProjectedVectors)[:, 2]
+                Project = np.array(self.eyes["PME"].StandardOrientationProjectedVectors)[:, 2]
                 ax.scatter(
                     Project[:, 0],
                     Project[:, 1],
@@ -1040,7 +892,7 @@ class Spider:
                     alpha=alpha,
                 )
             if "projection_full" in elements:
-                Project = np.array(self.PME.StandardOrientationProjectedVectorsFull)[
+                Project = np.array(self.eyes["PME"].StandardOrientationProjectedVectorsFull)[
                     :, 2
                 ]
                 ax.scatter(
@@ -1051,7 +903,7 @@ class Spider:
                     alpha=alpha,
                 )
             if "FOVoutline" in elements:
-                Outline = self.PME.FOVcontourPoints
+                Outline = self.eyes["PME"].FOVcontourPoints
                 ax.scatter(
                     Outline[:, 0],
                     Outline[:, 1],
@@ -1061,13 +913,13 @@ class Spider:
                 )
         if "PLE" in eyes and "PLE" in self.available_eyes:
             if "lens" in elements:
-                lens = self.PLE.StandardOrientationLensCloud.convex_hull.vertices
+                lens = self.eyes["PLE"].StandardOrientationLensCloud.convex_hull.vertices
                 ax.scatter(lens[:, 0], lens[:, 1], lens[:, 2], color="darkred")
             if "retina" in elements:
-                retina = self.PLE.StandardOrientationRetinaCloud.convex_hull.vertices
+                retina = self.eyes["PLE"].StandardOrientationRetinaCloud.convex_hull.vertices
                 ax.scatter(retina[:, 0], retina[:, 1], retina[:, 2], color="darkred")
             if "projection" in elements:
-                Project = np.array(self.PLE.StandardOrientationProjectedVectors)[:, 2]
+                Project = np.array(self.eyes["PLE"].StandardOrientationProjectedVectors)[:, 2]
                 ax.scatter(
                     Project[:, 0],
                     Project[:, 1],
@@ -1076,7 +928,7 @@ class Spider:
                     alpha=alpha,
                 )
             if "projection_full" in elements:
-                Project = np.array(self.PLE.StandardOrientationProjectedVectorsFull)[
+                Project = np.array(self.eyes["PLE"].StandardOrientationProjectedVectorsFull)[
                     :, 2
                 ]
                 ax.scatter(
@@ -1087,7 +939,7 @@ class Spider:
                     alpha=alpha,
                 )
             if "FOVoutline" in elements:
-                Outline = self.PLE.FOVcontourPoints
+                Outline = self.eyes["PLE"].FOVcontourPoints
                 ax.scatter(
                     Outline[:, 0],
                     Outline[:, 1],

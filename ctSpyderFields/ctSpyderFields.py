@@ -655,7 +655,7 @@ class Spider:
         :return:
         """
         print("Finding fields of view contours...", end="")
-        for i in len(range(self.available_eyes)):
+        for i in range(len(self.available_eyes)):
             self.eyes[list(self.available_eyes)[i]].find_field_contours(stepsizes[i], tolerances[i])
 
         print(" Done")

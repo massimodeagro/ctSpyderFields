@@ -12,12 +12,15 @@ import os  # looks into files and folder paths
 ### PLOTTING
 import matplotlib.pyplot as plt
 
-
+### Exceptions ###
 class UnrecognizedEye(Exception):
     pass
 
 
 class WrongCommand(Exception):
+    pass
+
+class InvalidDataset(Exception):
     pass
 
 
@@ -479,6 +482,11 @@ class Spider:
         self.available_eyes = available_eyes
 
         # TODO: implement this in all the other formulas
+        # self.eyes = {}
+        # for eye in self.available_eyes:
+        #     self.eyes[eye] = Eye(eye_identity=eye)
+
+        ## OLD version
         if "AME" in self.available_eyes:
             self.AME = Eye(eye_identity="AME")
         if "ALE" in self.available_eyes:
@@ -640,6 +648,10 @@ class Spider:
         """
         print('Computing lenses and retina geometries...', end='')
         for eye in self.available_eyes:
+            #self.eyes[eye].define_all_clouds()
+            #self.eyes[eye].align_to_zero()
+            #self.eyes[eye].find_lens_sphere()
+            #self.eyes[eye].rotate_back()
             self.compute_eye(eye)
         print(' Done')
 
@@ -809,6 +821,8 @@ class Spider:
             data = pd.read_pickle(self.path + filename + ".pickle")
         elif type == "h5":
             data = pd.read_hdf(self.path + filename + ".h5")
+        else:
+            raise InvalidDataset("Invalid extension " + type +  "of the file " + filename + " .")
 
         self.AME.LensPoints = data["AME"]["Lens"]["Original"]
         self.AME.RotatedLensPoints = data["AME"]["Lens"]["Rotated"]

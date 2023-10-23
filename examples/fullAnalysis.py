@@ -2,11 +2,16 @@
 Example script to compute a spider segmented with dragonfly. Make sure to have one folder with all the pngs for all the
 slices, containing segmented lens and retina for each eye, plus the 7 cephalothorax markers.
 """
-from ctSpyderFields import ctSpyderFields
+# Sys to add the path
+import sys
+import os
+sys.path.insert(0, os.path.expanduser('~') + '/ctSpyderFields/ctSpyderFields')
+
+import ctSpyderFields
 import numpy as np
 
 
-path = 'Data/Philaeus-chrysops/'
+path = '../Data/Philaeus-chrysops/'
 
 '''
 ### IF STARTING FROM DRAGONFLY

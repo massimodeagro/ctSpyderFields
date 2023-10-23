@@ -9,20 +9,11 @@ import pandas as pd  # to work with tables
 import numpy as np  # deals with matrix and arrays
 import os  # looks into files and folder paths
 
+# Storing Hard-Coded Parameters
+import yaml
+
 ### PLOTTING
 import matplotlib.pyplot as plt
-
-### Colors ###
-colors = {
-    "red":          [255, 0, 0],
-    "green":        [0, 255, 0],
-    "blue":         [0, 0, 255],
-    "magenta":      [255, 0, 255],
-    "purple":       [130, 0, 130],
-    "dark_green":   [0, 130, 0],
-    "teal_blue":    [0, 130, 130],
-    "dark_blue":    [0, 0, 130]
-}
 
 ### Exceptions ###
 class UnrecognizedEye(Exception):
@@ -45,22 +36,20 @@ class Eye:
         """
         :param eye_identity: one of AME, ALE, PME, PLE
         """
-        ## Standardized Data
-        self.EyeIdentity = eye_identity
-        if self.EyeIdentity == "AME":
-            LensColor = (np.array([250, 0, 250]), np.array([256, 0, 256]))
-            RetinaColor = (np.array([110, 0, 110]), np.array([130, 0, 130]))
-        elif self.EyeIdentity == "ALE":
-            LensColor = (np.array([0, 250, 0]), np.array([0, 256, 0]))
-            RetinaColor = (np.array([0, 110, 0]), np.array([0, 130, 0]))
-        elif self.EyeIdentity == "PME":
-            LensColor = (np.array([0, 250, 250]), np.array([0, 256, 256]))
-            RetinaColor = (np.array([0, 110, 110]), np.array([0, 130, 130]))
-        elif self.EyeIdentity == "PLE":
-            LensColor = (np.array([0, 0, 250]), np.array([0, 0, 256]))
-            RetinaColor = (np.array([0, 0, 110]), np.array([0, 0, 130]))
+        # Extract Parameters from YAML file
+        # Debug
+        with open('../ctSpyderFields/params.yaml', 'r') as file:
+            params = yaml.safe_load(file)
+
+        ## Standardized Data        
+        # New Method | More Robust and compact
+        if (eye_identity == "AME") or (eye_identity == "ALE") or (eye_identity == "PME") or (eye_identity == "PLE"):
+            self.EyeIdentity = eye_identity
+            LensColor = (np.array(params[eye_identity]["Lens"]["low_color"]), np.array(params[eye_identity]["Lens"]["high_color"]))
+            RetinaColor = (np.array(params[eye_identity]["Retina"]["low_color"]), np.array(params[eye_identity]["Retina"]["high_color"]))
         else:
-            raise UnrecognizedEye("You inputted the wrong eye name, abort.")
+           raise UnrecognizedEye("You inputted the wrong eye name, abort.")
+
         self.LensColor = LensColor
         self.RetinaColor = RetinaColor
 

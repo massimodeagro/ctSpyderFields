@@ -271,13 +271,13 @@ class Eye:
         rotate the sphere back to the original frame of reference
         """
 
-        rotationMatrix = np.linalg.inv(
+        homMatrix = np.linalg.inv(
             self.LensCloud.convex_hull.principal_inertia_transform
         )
 
         self.LensSphere = (
             self.RotatedLensSphere[0],
-            trimesh.transform_points([self.RotatedLensSphere[1]], rotationMatrix)[0],
+            trimesh.transform_points([self.RotatedLensSphere[1]], homMatrix)[0],
         )
 
     def orientToStandard(self, rotationMatrix):

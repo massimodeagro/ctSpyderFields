@@ -142,14 +142,18 @@ class Eye:
         This formula rotates both the retina points and the lens points according to the rotation-translation
         matrix found by pointcloud of retina, in order to align everything to the standard axis
         """
-        rotation_matrix = self.LensCloud.convex_hull.principal_inertia_transform
+        # Notation: # 
+        # Rotation Matrix is a 3x3 matrix (SO(3) group) that expresses a Rotation
+        # Homogeneous Matrix is a 4x4 matrix (SE(3) group) that expresses a Roto-translation
+
+        hom_matrix = self.LensCloud.convex_hull.principal_inertia_transform
 
         self.RotatedLensPoints = trimesh.transform_points(
-            self.LensPoints, rotation_matrix
+            self.LensPoints, hom_matrix
         )
         self.RotatedLensCloud = trimesh.points.PointCloud(self.RotatedLensPoints)
         self.RotatedRetinaPoints = trimesh.transform_points(
-            self.RetinaPoints, rotation_matrix
+            self.RetinaPoints, hom_matrix
         )
         self.RotatedRetinaCloud = trimesh.points.PointCloud(self.RotatedRetinaPoints)
 

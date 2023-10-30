@@ -2,11 +2,16 @@
 Example script to compute a spider segmented with dragonfly. Make sure to have one folder with all the pngs for all the
 slices, containing segmented lens and retina for each eye, plus the 7 cephalothorax markers.
 """
-from ctSpyderFields import ctSpyderFields
+# Sys to add the path
+import sys
+import os
+sys.path.insert(0, os.path.expanduser('~') + '/ctSpyderFields/ctSpyderFields')
+
+import ctSpyderFields
 import numpy as np
 
 
-path = 'Data/Philaeus-chrysops/'
+path = '../Data/Philaeus-chrysops/'
 
 '''
 ### IF STARTING FROM DRAGONFLY
@@ -52,29 +57,31 @@ z = 150/0.003 * np.cos(v)
 
 sphere = go.Surface(x=x, y=y, z=z, opacity=0.7,colorscale=[[0, 'white'], [1,'white']],
              showscale=False)
-Outline = PhilaeusChrysops.AME.FOVcontourPoints
+
+# Compact Form
+Outline = PhilaeusChrysops.eyes["AME"].FOVcontourPoints
 dots1 = go.Scatter3d(x=Outline[:,0], y=Outline[:,1], z=Outline[:,2],
                      mode='markers', marker={'color': 'purple', 'size': 3})
-Outline = PhilaeusChrysops.ALE.FOVcontourPoints
+Outline = PhilaeusChrysops.eyes["ALE"].FOVcontourPoints
 dots2 = go.Scatter3d(x=Outline[:,0], y=Outline[:,1], z=Outline[:,2],
                      mode='markers', marker={'color': 'green', 'size': 3})
-Outline = PhilaeusChrysops.PME.FOVcontourPoints
+Outline = PhilaeusChrysops.eyes["PME"].FOVcontourPoints
 dots3 = go.Scatter3d(x=Outline[:,0], y=Outline[:,1], z=Outline[:,2],
                      mode='markers', marker={'color': 'goldenrod', 'size': 3})
-Outline = PhilaeusChrysops.PLE.FOVcontourPoints
+Outline = PhilaeusChrysops.eyes["PLE"].FOVcontourPoints
 dots4 = go.Scatter3d(x=Outline[:,0], y=Outline[:,1], z=Outline[:,2],
                      mode='markers', marker={'color': 'darkred', 'size': 3})
 
-Outline = PhilaeusChrysops.AME.FOVcontourPoints
+Outline = PhilaeusChrysops.eyes["AME"].FOVcontourPoints
 dots1rev = go.Scatter3d(x=np.multiply(Outline[:,0], -1), y=Outline[:,1], z=Outline[:,2],
                         mode='markers', marker={'color':'purple', 'size': 3})
-Outline = PhilaeusChrysops.ALE.FOVcontourPoints
+Outline = PhilaeusChrysops.eyes["ALE"].FOVcontourPoints
 dots2rev = go.Scatter3d(x=np.multiply(Outline[:,0], -1), y=Outline[:,1], z=Outline[:,2],
                         mode='markers', marker={'color':'green', 'size': 3})
-Outline = PhilaeusChrysops.PME.FOVcontourPoints
+Outline = PhilaeusChrysops.eyes["PME"].FOVcontourPoints
 dots3rev = go.Scatter3d(x=np.multiply(Outline[:,0], -1), y=Outline[:,1], z=Outline[:,2],
                         mode='markers', marker={'color':'goldenrod', 'size': 3})
-Outline = PhilaeusChrysops.PLE.FOVcontourPoints
+Outline = PhilaeusChrysops.eyes["PLE"].FOVcontourPoints
 dots4rev = go.Scatter3d(x=np.multiply(Outline[:,0], -1), y=Outline[:,1], z=Outline[:,2],
                         mode='markers', marker={'color':'darkred', 'size': 3})
 

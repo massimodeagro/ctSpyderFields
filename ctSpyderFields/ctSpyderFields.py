@@ -140,13 +140,14 @@ class Eye:
     def align_to_zero(self):
         """
         This formula rotates both the retina points and the lens points according to the rotation-translation
-        matrix found by pointcloud of retina, in order to align everything to the standard axis
+        matrix found by pointcloud of lens, in order to align everything to the standard axis
         """
         # Notation: # 
         # Rotation Matrix is a 3x3 matrix (SO(3) group) that expresses a Rotation
         # Homogeneous Matrix is a 4x4 matrix (SE(3) group) that expresses a Roto-translation
 
         hom_matrix = self.LensCloud.convex_hull.principal_inertia_transform
+        # principal_inertia_transform maps points in {Camera} frame in {Lens} frame
 
         self.RotatedLensPoints = trimesh.transform_points(
             self.LensPoints, hom_matrix
@@ -156,6 +157,7 @@ class Eye:
             self.RetinaPoints, hom_matrix
         )
         self.RotatedRetinaCloud = trimesh.points.PointCloud(self.RotatedRetinaPoints)
+        ### The points expressed in SoR {Camera} are expressed now in the {Lens} SoR
 
     def find_split_plane(self):
         """
@@ -163,6 +165,9 @@ class Eye:
         as well as on which side of the two is the retina and on which is the lens.
         This is needed for finding the cap of the lens.
         """
+
+        # The cap of the lens is the part of the lens convex_hull that is the farthest
+        # respect to the Retina
 
         LensSpanX = (
             max(self.RotatedLensCloud.vertices[:, 0]),
@@ -210,9 +215,8 @@ class Eye:
                     mask = self.RotatedLensCloud.convex_hull.vertices[:, 2] > 0
                 else:
                     mask = self.RotatedLensCloud.convex_hull.vertices[:, 2] < 0
-            self.RotatedLensSurfacePoints = self.RotatedLensCloud.convex_hull.vertices[
-                mask, :
-            ]
+            
+            self.RotatedLensSurfacePoints = self.RotatedLensCloud.convex_hull.vertices[mask, :]
         else:
             print("cry")  # TODO: do a better error catching process
             pass
@@ -280,24 +284,16 @@ class Eye:
             trimesh.transform_points([self.RotatedLensSphere[1]], homMatrix)[0],
         )
 
-    def orientToStandard(self, rotationMatrix):
+    def orientToStandard(self, hom_matrix):
         print(f'Reorienting {self.EyeIdentity} dots...', end='')
-        self.StandardOrientationLensPoints = trimesh.transform_points(
-            self.LensPoints, rotationMatrix
-        )
-        self.StandardOrientationLensCloud = trimesh.points.PointCloud(
-            self.StandardOrientationLensPoints
-        )
-        self.StandardOrientationRetinaPoints = trimesh.transform_points(
-            self.RetinaPoints, rotationMatrix
-        )
-        self.StandardOrientationRetinaCloud = trimesh.points.PointCloud(
-            self.StandardOrientationRetinaPoints
-        )
-        self.StandardOrientationLensSphere = (
-            self.LensSphere[0],
-            trimesh.transform_points([self.LensSphere[1]], rotationMatrix)[0],
-        )
+        # Lens
+        self.StandardOrientationLensPoints = trimesh.transform_points(self.LensPoints, hom_matrix)
+        self.StandardOrientationLensCloud = trimesh.points.PointCloud(self.StandardOrientationLensPoints)
+        # Retina
+        self.StandardOrientationRetinaPoints = trimesh.transform_points(self.RetinaPoints, hom_matrix)
+        self.StandardOrientationRetinaCloud = trimesh.points.PointCloud(self.StandardOrientationRetinaPoints)
+        # Lens Sphere
+        self.StandardOrientationLensSphere = (self.LensSphere[0], trimesh.transform_points([self.LensSphere[1]], hom_matrix)[0], )
         print(' Done')
 
     def project_retina(self, visual_field_radius):
@@ -624,20 +620,14 @@ class Spider:
         self.cephalothoraxCloud = trimesh.points.PointCloud(allpoints)
 
     def orient_to_standard(self):
-        rotationMatrix = self.cephalothoraxCloud.convex_hull.principal_inertia_transform
+        hom_matrix = self.cephalothoraxCloud.convex_hull.principal_inertia_transform
 
         # Rotate each eye
         for eye in self.available_eyes:
-            self.eyes[eye].orientToStandard(rotationMatrix)
+            self.eyes[eye].orientToStandard(hom_matrix)
 
         for marker in self.cephalothoraxMarkers:
-            self.StandardOrientationCephalothoraxPoints[
-                marker
-            ] = trimesh.transform_points(
-                [self.cephalothoraxMarkers[marker]], rotationMatrix
-            )[
-                0
-            ]
+            self.StandardOrientationCephalothoraxPoints[marker] = trimesh.transform_points([self.cephalothoraxMarkers[marker]], hom_matrix)[0]
 
     def project_retinas(self, field_mm):
         # Project each retina

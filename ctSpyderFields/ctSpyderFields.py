@@ -337,6 +337,8 @@ class Eye:
 
         print(f"Projecting {self.EyeIdentity} retina...", end="")
         self.StandardOrientationProjectedVectorsFull = []
+
+        # s = sphere's center
         sx = self.StandardOrientationLensSphere[1][0]
         sy = self.StandardOrientationLensSphere[1][1]
         sz = self.StandardOrientationLensSphere[1][2]
@@ -344,30 +346,19 @@ class Eye:
             rx = point[0]
             ry = point[1]
             rz = point[2]
-            v = (sx - rx, sy - ry, sz - rz)
-            vmag = np.sqrt(v[0] ** 2 + v[1] ** 2 + v[2] ** 2)
-            vu = (v[0] / vmag, v[1] / vmag, v[2] / vmag)
+            # Compute distance between every point of retina with
+            # the center of the lens sphere
+            v = (rx - sx, ry - sy, rz - sz)
+            v_norm = np.linalg.norm(v)
+            vu = (v[0] / v_norm, v[1] / v_norm, v[2] / v_norm)
 
             """Ray/sphere intersection, from https://gist.github.com/thegedge/4769985"""
-            vuflip = np.multiply(
-                vu, -1
-            )  # I have no idea why, but data is wrong with the vector as calculated above, needs to be pointing in the other direction
             r = visual_field_radius
-            dDotR0 = np.dot(vuflip, point)
+            dDotR0 = np.dot(vu, point)
             t = -dDotR0 - (dDotR0 * dDotR0 - np.dot(point, point) + r * r) ** 0.5
 
-            self.StandardOrientationProjectedVectorsFull.append(
-                [
-                    point,
-                    vuflip,
-                    (
-                        point[0] + t * vuflip[0],
-                        point[1] + t * vuflip[1],
-                        point[2] + t * vuflip[2],
-                    ),
-                ]
-            )
-            self.focalLengthsFull.append([point, vmag])
+            self.StandardOrientationProjectedVectorsFull.append([point, vu, (point[0] + t * vu[0], point[1] + t * vu[1], point[2] + t * vu[2], ),])
+            self.focalLengthsFull.append([point, v_norm])
         print(' Done')
 
     def plane_slicer(self, plane, face, stepsize, tolerance):

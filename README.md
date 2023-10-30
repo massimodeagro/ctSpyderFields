@@ -19,8 +19,12 @@ git clone https://github.com/massimodeagro/ctSpyderFields.git
 python -m venv ~/path/to/new/virtual/environment
 source ~/path/to/new/virtual/environment/bin/activate
 ```
-**Step 2**: Install the dependencies, using pip.
+**Step 2**: Switch in the directory `ctSpyderFields`, then install the dependencies, using pip.
 ```bash
 pip install -r requirements.txt
 ```
 That's all folks! You can easily run the examples to test the package.
+```bash
+cd <ctSpyderFields_package_path>/ctSpyderFields/examples
+python fullAnalysis.py
+```

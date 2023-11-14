@@ -353,9 +353,8 @@ class Eye:
             vu = (v[0] / v_norm, v[1] / v_norm, v[2] / v_norm)
 
             """Ray/sphere intersection, from https://gist.github.com/thegedge/4769985"""
-            r = visual_field_radius
             dDotR0 = np.dot(vu, point)
-            t = -dDotR0 - (dDotR0 * dDotR0 - np.dot(point, point) + r * r) ** 0.5
+            t = -dDotR0 - (dDotR0 * dDotR0 - np.dot(point, point) + visual_field_radius * visual_field_radius) ** 0.5
 
             self.StandardOrientationProjectedVectorsFull.append([point, vu, (point[0] + t * vu[0], point[1] + t * vu[1], point[2] + t * vu[2], ),])
             self.focalLengthsFull.append([point, v_norm])

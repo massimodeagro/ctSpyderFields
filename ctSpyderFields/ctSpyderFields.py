@@ -32,14 +32,12 @@ class Eye:
     all the data for each eye
     """
 
-    def __init__(self, eye_identity: str):
+    def __init__(self, eye_identity: str, params):
         """
         :param eye_identity: one of AME, ALE, PME, PLE
         """
         # Extract Parameters from YAML file
         # Debug
-        with open('../ctSpyderFields/params.yaml', 'r') as file:
-            params = yaml.safe_load(file)
 
         ## Standardized Data        
         # New Method | More Robust and compact
@@ -80,6 +78,7 @@ class Eye:
         self.focalLengthsFull = []
         self.FOVcontourPoints = None
 
+    '''
     def amira_find_lens_points(self, labels_pictures_list):
         """
         this formula takes the list of label pictures and threshold it based on
@@ -120,12 +119,27 @@ class Eye:
         """
         self.amira_find_lens_points(labels_pictures_list)
         self.amira_find_retinas_points(labels_pictures_list)
+    '''
 
-    def dragonfly_find_points(self, piclist, part="Lens"):
-        if part == "Lens":
-            self.LensPoints = np.argwhere(np.array(piclist) > 0)
-        elif part == "Retina":
-            self.RetinaPoints = np.argwhere(np.array(piclist) > 0)
+    def find_points(self, piclist, part="Lens", style='binary'):
+        if style == 'binary':
+            if part == "Lens":
+                self.LensPoints = np.argwhere(np.array(piclist) > 0)
+            elif part == "Retina":
+                self.RetinaPoints = np.argwhere(np.array(piclist) > 0)
+        elif style== 'color':
+            if part == "Lens":
+                for label in tqdm(piclist, desc="finding " + self.EyeIdentity + " Lens"):  # for every slice
+                    # find pixels with the determined color and set them as 1, all else as 0
+                    self.LensMask.append(cv2.inRange(label, self.LensColor[0], self.LensColor[1]))
+                self.LensMask = np.array(self.LensMask)
+                self.LensPoints = np.argwhere(self.LensMask > 0)
+            elif part == "Retina":
+                for label in tqdm(piclist, desc="finding " + self.EyeIdentity + " Retina"):  # for every slice
+                    # find pixels with the determined color and set them as 1, all else as 0
+                    self.RetinaMask.append(cv2.inRange(label, self.RetinaColor[0], self.RetinaColor[1]))
+                self.RetinaMask = np.array(self.RetinaMask)
+                self.RetinaPoints = np.argwhere(self.RetinaMask > 0)
 
     def define_lens_cloud(self):
         self.LensCloud = trimesh.points.PointCloud(self.LensPoints)
@@ -469,7 +483,8 @@ class Spider:
     def __init__(
         self,
         workdir,
-        dragonfly_label_names=None,
+        paramspath,
+        label_names=None,
         voxelsize=0.001,
         available_eyes: list = ["AME", "ALE", "PME", "PLE"],
     ):
@@ -484,10 +499,13 @@ class Spider:
         self.path = workdir
         self.available_eyes = available_eyes
 
+        with open(paramspath, 'r') as file:
+            self.colors = yaml.safe_load(file)
+
         ## New Version with a Dictionary
         self.eyes = {}
         for eye in self.available_eyes:
-            self.eyes[eye] = Eye(eye_identity=eye)
+            self.eyes[eye] = Eye(eye_identity=eye, params=self.colors)
 
         self.cephalothoraxMarkers = {
             "center": [],
@@ -509,10 +527,10 @@ class Spider:
             "right": [],
         }
 
-        self.AmiraLabelPictures = []
-        self.DragonflyLabelNames = dragonfly_label_names
+        self.FullLabelPictures = []
+        self.LabelNames = label_names
 
-        self.DragonflyLabelPictures = {
+        self.SeparateLabelPictures = {
             "AME": {"Lens": [], "Retina": []},
             "ALE": {"Lens": [], "Retina": []},
             "PME": {"Lens": [], "Retina": []},
@@ -528,7 +546,11 @@ class Spider:
             },
         }
 
-    def amira_load_labels(self):
+    '''
+    
+    LEGACY CODE. KEEP FOR NOW BUT TO TRASH
+    
+    def amira_load_full_labels(self):
         for file in tqdm(sorted(os.listdir(self.path)), desc="loading images"):
             self.AmiraLabelPictures.append(cv2.imread(self.path + file, 1))
 
@@ -536,8 +558,8 @@ class Spider:
         # Find Lens and Retina Points for each eye
         for eye in self.available_eyes:
             self.eyes[eye].amira_find_all_points(self.AmiraLabelPictures)
-
-    def dragonfly_load_label(self, labelname, group, object):
+    '''
+    def load_label_split(self, labelname, group, object, style='binary'):
         """
         This function pull all the pngs from workdir and load them according to file names
         provided in self.DragonflyLabelNames
@@ -551,29 +573,31 @@ class Spider:
             if file.startswith(labelname):
                 imagelist.append(file)
         for file in tqdm(sorted(imagelist), desc="loading " + labelname):
-            self.DragonflyLabelPictures[group][object].append(
-                cv2.imread(self.path + file, 0)
-            )
-
-    def dragonfly_load_all_labels(self):
+            if style=='binary':
+                self.SeparateLabelPictures[group][object].append(cv2.imread(self.path + file, 0))
+            elif style == 'color':
+                self.SeparateLabelPictures[group][object].append(cv2.imread(self.path + file, 1))
+    def load_all_labels_split(self,  style='binary'):
         """
         This function calls dragonfly_load_label for 4 + 7 times
         """
         for eye in self.available_eyes:
-            for label in self.DragonflyLabelNames[eye]:
-                self.dragonfly_load_label(
-                    labelname=self.DragonflyLabelNames[eye][label],
+            for label in self.LabelNames[eye]:
+                self.load_label_split(
+                    labelname=self.LabelNames[eye][label],
                     group=eye,
                     object=label,
+                    style=style
                 )
-        for marker in self.DragonflyLabelPictures["Markers"]:
-            self.dragonfly_load_label(
-                labelname=self.DragonflyLabelNames["Markers"][marker],
+        for marker in self.SeparateLabelPictures["Markers"]:
+            self.load_label_split(
+                labelname=self.LabelNames["Markers"][marker],
                 group="Markers",
                 object=marker,
+                style=style
             )
 
-    def dragonfly_find_eyes_points(self):
+    def find_eyes_points(self, style='binary'):
         """
         helper function to find all eyes at once. to see how points are found, look in class eyes, function dragonfly_find_points
         """
@@ -581,7 +605,7 @@ class Spider:
         for eye in self.available_eyes:
             print("finding " + eye + " points...")
             for blob in ["Lens", "Retina"]:
-                self.eyes[eye].dragonfly_find_points(piclist=self.DragonflyLabelPictures[eye][blob], part=blob)
+                self.eyes[eye].find_points(piclist=self.SeparateLabelPictures[eye][blob], part=blob, style=style)
 
     def compute_eye(self, eye):
         """
@@ -605,16 +629,22 @@ class Spider:
             self.compute_eye(eye)
         print(' Done')
 
-    def compute_cephalothorax(self):
+    def compute_cephalothorax(self, style='binary'):
         """
         this first translates the binary pictures in a set of points, and then find the center
         """
         allpoints = []
         for marker in self.cephalothoraxMarkers:
             print("finding " + marker + " points...")
-            dots = np.argwhere(
-                np.array(self.DragonflyLabelPictures["Markers"][marker]) > 0
-            )
+            if style == 'binary':
+                dots = np.argwhere(np.array(self.SeparateLabelPictures["Markers"][marker]) > 0)
+            elif style == 'color':
+                tmpdots = []
+                for label in tqdm(self.SeparateLabelPictures["Markers"][marker], desc="finding " + marker + " points"):  # for every slice
+                    # find pixels with the determined color and set them as 1, all else as 0
+                    tmpdots.append(cv2.inRange(label, self.colors[marker]["low_color"], self.colors[marker]["high_color"]))
+                tmpdots = np.array(tmpdots)
+                dots = np.argwhere(tmpdots > 0)
             self.cephalothoraxMarkers[marker] = (
                 np.mean(dots[:, 0]),
                 np.mean(dots[:, 1]),

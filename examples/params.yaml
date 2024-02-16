@@ -26,3 +26,26 @@ PLE:
   Retina:
     low_color: [0, 0, 110]
     high_color: [0, 0, 130]
+
+Markers:
+  center:
+    low_color: [0, 0, 250]
+    high_color: [0, 0, 256]
+  front:
+    low_color: [0, 0, 110]
+    high_color: [0, 0, 130]
+  back:
+    low_color: [ 0, 0, 110 ]
+    high_color: [ 0, 0, 130 ]
+  top:
+    low_color: [ 0, 0, 110 ]
+    high_color: [ 0, 0, 130 ]
+  bottom:
+    low_color: [ 0, 0, 110 ]
+    high_color: [ 0, 0, 130 ]
+  left:
+    low_color: [ 0, 0, 110 ]
+    high_color: [ 0, 0, 130 ]
+  right:
+    low_color: [ 0, 0, 110 ]
+    high_color: [ 0, 0, 130 ]

@@ -1,27 +1,30 @@
 """
 Example script to compute a spider segmented with dragonfly. Make sure to have one folder with all the pngs for all the
-slices, containing segmented lens and retina for each eye, plus the 7 cephalothorax markers.
+slices, containing segmented lens and retina for each eye, plus the 7 cephalothorax markers. Always pass a param, even if empty
 """
 from ctSpyderFields import ctSpyderFields
 import numpy as np
 
 
-path = 'C:/Users/lauren.sumner-rooney/Documents/DragonflyProjects/DragonflyExport/VisualFieldFinder/Philaeus-chrysops/'
-phillabelnames = {'AME': {'Lens': 'Philaeus_chrysops-Lenses-AME', 'Retina': 'Philaeus_chrysops-Retinas-AME'},
-                  'ALE': {'Lens': 'Philaeus_chrysops-Lenses-ALE', 'Retina': 'Philaeus_chrysops-Retinas-ALE'},
-                  'PME': {'Lens': 'Philaeus_chrysops-Lenses-PME', 'Retina': 'Philaeus_chrysops-Retinas-PME'},
-                  'PLE': {'Lens': 'Philaeus_chrysops-Lenses-PLE', 'Retina': 'Philaeus_chrysops-Retinas-PLE'},
-                  'Markers': {'center': 'Philaeus_chrysops-Markers-center',
-                              'front': 'Philaeus_chrysops-Markers-front', 'back': 'Philaeus_chrysops-Markers-back',
-                              'bottom': 'Philaeus_chrysops-Markers-bottom', 'top': 'Philaeus_chrysops-Markers-top',
-                              'left': 'Philaeus_chrysops-Markers-left', 'right': 'Philaeus_chrysops-Markers-right'}}
+path = '/path/to/images/'
+paramspath = '/path/to/params/params.yaml'
 
-PhilaeusChrysops = ctSpyderFields.Spider(workdir=path, dragonfly_label_names=phillabelnames, voxelsize=0.003)
-PhilaeusChrysops.dragonfly_load_all_labels()
+labelnames = {'AME': {'Lens': 'Lens_AME', 'Retina': 'Retina_AME'},
+                  'ALE': {'Lens': 'Lens_ALE', 'Retina': 'Retina_ALE'},
+                  'PME': {'Lens': 'Lens_PME', 'Retina': 'Retina_PME'},
+                  'PLE': {'Lens': 'Lens_PLE', 'Retina': 'Retina_PLE'},
+                  'Markers': {'center': 'Marker_center',
+                              'front': 'Marker_front', 'back': 'Marker_back',
+                              'bottom': 'Marker_bottom', 'top': 'Marker_top',
+                              'left': 'Marker_left', 'right': 'Marker_right'}}
 
-PhilaeusChrysops.compute_cephalothorax()
-PhilaeusChrysops.dragonfly_find_eyes_points()
-PhilaeusChrysops.compute_eyes()
-PhilaeusChrysops.orient_to_standard()
+GenusSpecies = ctSpyderFields.Spider(workdir=path, label_names=labelnames, voxelsize=0.001, paramspath=paramspath)
+GenusSpecies.load_all_labels_split(style='color')
+GenusSpecies.find_eyes_points(style='color')
+GenusSpecies.compute_cephalothorax(style='color')
+GenusSpecies.compute_eyes()
+GenusSpecies.orient_to_standard()
 
-PhilaeusChrysops.project_retinas(field_mm=150)
+GenusSpecies.project_retinas_full(field_mm=150)
+GenusSpecies.save(filename='GenusSpecies')
+GenusSpecies.save('GenusSpecies', type='h5')

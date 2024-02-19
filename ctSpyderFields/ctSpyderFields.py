@@ -15,6 +15,9 @@ import yaml
 ### PLOTTING
 import matplotlib.pyplot as plt
 
+## PCA
+from sklearn.decomposition import PCA
+
 ### Exceptions ###
 class UnrecognizedEye(Exception):
     pass
@@ -642,7 +645,7 @@ class Spider:
         for i in range(len(self.available_eyes)):
             self.eyes[list(self.available_eyes)[i]].find_field_contours(stepsizes[i], tolerances[i])
 
-        print(" Done")
+        print(" Done")        
         
     def head_SoR(self):
         ## Plot points ##
@@ -661,6 +664,8 @@ class Spider:
         marker_type = list(self.cephalothoraxMarkers.keys())
         marker_color = ['#323031', '#177E89', '#084C61', '#DB3A34', '#FFC857', '#FF9F1C', '#8ED081']
         
+        point_dataset = []
+        
         # For each marker, plot a different color
         for i in range(n_marker):
             ax.scatter(self.cephalothoraxMarkers[marker_type[i]][0], 
@@ -671,6 +676,9 @@ class Spider:
                     self.cephalothoraxMarkers[marker_type[i]][1], 
                     self.cephalothoraxMarkers[marker_type[i]][2],
                     marker_type[i])
+            point_dataset.append(list(self.cephalothoraxMarkers[marker_type[i]]))
+        
+        point_dataset = np.array(point_dataset)            
         
         # Plot axes
         # (x) back -> top
@@ -687,6 +695,7 @@ class Spider:
                 [self.cephalothoraxMarkers['right'][2], self.cephalothoraxMarkers['left'][2]], 'g')
         
         ## Create 3D Rectangle ##
+        
         x_hand = np.array(list(self.cephalothoraxMarkers['front'])) - np.array(list(self.cephalothoraxMarkers['back']))
         width = np.linalg.norm(x_hand)
         y_hand = np.array(list(self.cephalothoraxMarkers['left'])) - np.array(list(self.cephalothoraxMarkers['right']))
@@ -694,26 +703,63 @@ class Spider:
         z_hand = np.array(list(self.cephalothoraxMarkers['top'])) - np.array(list(self.cephalothoraxMarkers['bottom']))
         height = np.linalg.norm(z_hand)
 
-        
         ax.set_xlabel('X [pixel]')
         ax.set_ylabel('Y [pixel]')
         ax.set_zlabel('Z [n° layer]')
         
-        # # Find center of every axis
-        # t = 0.5
-        # x_center = np.array(list(self.cephalothoraxMarkers['back'])) + t*x_hand
-        # y_center = np.array(list(self.cephalothoraxMarkers['right'])) + t*y_hand
-        # z_center = np.array(list(self.cephalothoraxMarkers['bottom'])) + t*z_hand
+        # Proposal 1: PCA
+        # Advantages: the best method to have a reference system with minimal differences
+        # between the axes and the experimental points
+        # Principal Component Analysis
+        mean = np.mean(point_dataset, axis=0)
+        centered_dataset = point_dataset - mean
+        cov_matrix = np.cov(centered_dataset, rowvar=False)
+        pca = PCA()
+        pca.fit(cov_matrix)
         
-        # ax.scatter(x_center[0], x_center[1], x_center[2], marker='^')
-        # ax.text(x_center[0], x_center[1], x_center[2], 'x_center')
+        # Find the index of the axis with the smallest absolute eigenvalue
+        min_abs_eigenvalue_index = np.argmin(np.abs(np.linalg.eigvals(pca.components_)))
+        # Flip the sign of the corresponding axis
+        pca.components_[:, min_abs_eigenvalue_index] *= -1
         
-        # ax.scatter(y_center[0], y_center[1], y_center[2], marker='^')
-        # ax.text(y_center[0], y_center[1], y_center[2], 'y_center')
+        # Compute the dot product between each principal axis and the back-front direction
+        dot_products = np.abs(np.dot(pca.components_, x_hand))
+
+        # Sort the principal axes based on the absolute dot product values
+        sorted_indices = np.argsort(dot_products)[::-1]
+
+        # Reassign the axes accordingly
+        sorted_axes = pca.components_[sorted_indices]
         
-        # ax.scatter(z_center[0], z_center[1], z_center[2], marker='^')
-        # ax.text(z_center[0], z_center[1], z_center[2], 'z_center')
+        # Plot the principal axes
+        origin = mean
+        ax.scatter(mean[0], mean[1], mean[2])
+        ax.text(mean[0], mean[1], mean[2], 'mean')
         
+        for axis in pca.components_.T:
+            ax.quiver(*origin, *axis, length=500)
+        
+        # Proposal 2
+        # # Axis 1: back -> front
+        # x_axis = x_hand
+        # x_center = np.array(list(self.cephalothoraxMarkers['back'])) + 0.5*x_hand
+        # x_axis /= width
+        
+        # # Orthogonal Distance Regression
+
+        
+        
+        # # # Finally, find y by cross product (z cross x)
+        # # y_axis =  np.cross(z_axis, x_axis)
+        
+        # # R = [x_axis, z_axis]
+        # # print(np.linalg.det(R))
+        # origin = x_center
+        # R = []
+        
+        # for axis in R:
+        #     ax.quiver(*origin, *axis, length=500)
+                
         plt.show()
 
     def save(self, filename, type="pickle"):

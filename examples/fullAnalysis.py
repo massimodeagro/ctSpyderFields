@@ -5,7 +5,9 @@ slices, containing segmented lens and retina for each eye, plus the 7 cephalotho
 # Sys to add the path
 import sys
 import os
-sys.path.insert(0, os.path.expanduser('~') + '/ctSpyderFields/ctSpyderFields')
+INTERNAL_PATH = '/spider_ws' + '/ctSpyderFields/ctSpyderFields'
+sys.path.append(os.path.expanduser('~') + INTERNAL_PATH)
+# sys.path.insert(0, os.path.expanduser('~') + INTERNAL_PATH)
 
 import ctSpyderFields
 import numpy as np

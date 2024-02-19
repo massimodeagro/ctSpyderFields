@@ -643,6 +643,78 @@ class Spider:
             self.eyes[list(self.available_eyes)[i]].find_field_contours(stepsizes[i], tolerances[i])
 
         print(" Done")
+        
+    def head_SoR(self):
+        ## Plot points ##
+        # Create fig obj
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='3d')
+        ax.view_init(elev=-160, azim=106)
+        
+        # Switch left & right (human error)
+        left_value = self.cephalothoraxMarkers['left']
+        self.cephalothoraxMarkers['left'] = self.cephalothoraxMarkers['right']
+        self.cephalothoraxMarkers['right'] = left_value 
+        
+        # Read all markers
+        n_marker = len(self.cephalothoraxMarkers)
+        marker_type = list(self.cephalothoraxMarkers.keys())
+        marker_color = ['#323031', '#177E89', '#084C61', '#DB3A34', '#FFC857', '#FF9F1C', '#8ED081']
+        
+        # For each marker, plot a different color
+        for i in range(n_marker):
+            ax.scatter(self.cephalothoraxMarkers[marker_type[i]][0], 
+                       self.cephalothoraxMarkers[marker_type[i]][1], 
+                       self.cephalothoraxMarkers[marker_type[i]][2],
+                       color = marker_color[i])
+            ax.text(self.cephalothoraxMarkers[marker_type[i]][0], 
+                    self.cephalothoraxMarkers[marker_type[i]][1], 
+                    self.cephalothoraxMarkers[marker_type[i]][2],
+                    marker_type[i])
+        
+        # Plot axes
+        # (x) back -> top
+        ax.plot([self.cephalothoraxMarkers['back'][0], self.cephalothoraxMarkers['front'][0]], 
+                [self.cephalothoraxMarkers['back'][1], self.cephalothoraxMarkers['front'][1]],
+                [self.cephalothoraxMarkers['back'][2], self.cephalothoraxMarkers['front'][2]], 'r')
+        # (z) bottom -> top
+        ax.plot([self.cephalothoraxMarkers['bottom'][0], self.cephalothoraxMarkers['top'][0]], 
+                [self.cephalothoraxMarkers['bottom'][1], self.cephalothoraxMarkers['top'][1]],
+                [self.cephalothoraxMarkers['bottom'][2], self.cephalothoraxMarkers['top'][2]], 'b')
+        # (y) right -> left
+        ax.plot([self.cephalothoraxMarkers['right'][0], self.cephalothoraxMarkers['left'][0]], 
+                [self.cephalothoraxMarkers['right'][1], self.cephalothoraxMarkers['left'][1]],
+                [self.cephalothoraxMarkers['right'][2], self.cephalothoraxMarkers['left'][2]], 'g')
+        
+        ## Create 3D Rectangle ##
+        x_hand = np.array(list(self.cephalothoraxMarkers['front'])) - np.array(list(self.cephalothoraxMarkers['back']))
+        width = np.linalg.norm(x_hand)
+        y_hand = np.array(list(self.cephalothoraxMarkers['left'])) - np.array(list(self.cephalothoraxMarkers['right']))
+        depth = np.linalg.norm(y_hand)
+        z_hand = np.array(list(self.cephalothoraxMarkers['top'])) - np.array(list(self.cephalothoraxMarkers['bottom']))
+        height = np.linalg.norm(z_hand)
+
+        
+        ax.set_xlabel('X [pixel]')
+        ax.set_ylabel('Y [pixel]')
+        ax.set_zlabel('Z [n° layer]')
+        
+        # # Find center of every axis
+        # t = 0.5
+        # x_center = np.array(list(self.cephalothoraxMarkers['back'])) + t*x_hand
+        # y_center = np.array(list(self.cephalothoraxMarkers['right'])) + t*y_hand
+        # z_center = np.array(list(self.cephalothoraxMarkers['bottom'])) + t*z_hand
+        
+        # ax.scatter(x_center[0], x_center[1], x_center[2], marker='^')
+        # ax.text(x_center[0], x_center[1], x_center[2], 'x_center')
+        
+        # ax.scatter(y_center[0], y_center[1], y_center[2], marker='^')
+        # ax.text(y_center[0], y_center[1], y_center[2], 'y_center')
+        
+        # ax.scatter(z_center[0], z_center[1], z_center[2], marker='^')
+        # ax.text(z_center[0], z_center[1], z_center[2], 'z_center')
+        
+        plt.show()
 
     def save(self, filename, type="pickle"):
         """
@@ -773,6 +845,8 @@ class Spider:
             points.append(self.cephalothoraxMarkers[marker])
         self.cephalothoraxCloud = trimesh.points.PointCloud(points)
         self.StandardOrientationCephalothoraxPoints = data["cephalothorax"]["Rotated"]
+        
+        self.head_SoR()
 
         print(" Done")
 

@@ -646,6 +646,28 @@ class Spider:
             self.eyes[list(self.available_eyes)[i]].find_field_contours(stepsizes[i], tolerances[i])
 
         print(" Done")        
+      
+    def pure_geometrical(self, u, v):
+        ### This value is obtained by:    ###
+        # w \in null(A)                     #
+        # where A = [v.T; cross(u, v).T]    #
+        # This condition means that the     #
+        # vector w is orthogonal with v     #
+        # and coplanar with u.              #
+        #####################################
+        
+        w = []
+        # w[0]
+        w.append((u[0]*(v[1]**2 + v[2]**2) - v[0]*(u[1]*v[1] + u[2]*v[2]))/(u[2]*(v[0]**2 + v[1]**2) - v[2]*(u[0]*v[0] + u[1]*v[1])))
+        # w[1]
+        w.append((u[1]*(v[0]**2 + v[2]**2) - v[1]*(u[0]*v[0] + u[2]*v[2]))/(u[2]*(v[0]**2 + v[1]**2) - v[2]*(u[0]*v[0] + u[1]*v[1])))
+        # w[2]
+        w.append(1.0)
+        w = np.array(w)
+        
+        # Normalizing
+        w /= np.linalg.norm(w)
+        return w
         
     def head_SoR(self):
         ## Plot points ##
@@ -707,58 +729,57 @@ class Spider:
         ax.set_ylabel('Y [pixel]')
         ax.set_zlabel('Z [n° layer]')
         
-        # Proposal 1: PCA
-        # Advantages: the best method to have a reference system with minimal differences
-        # between the axes and the experimental points
-        # Principal Component Analysis
-        mean = np.mean(point_dataset, axis=0)
-        centered_dataset = point_dataset - mean
-        cov_matrix = np.cov(centered_dataset, rowvar=False)
-        pca = PCA()
-        pca.fit(cov_matrix)
+        # # Proposal 1: PCA
+        # # Advantages: the best method to have a reference system with minimal differences
+        # # between the axes and the experimental points
+        # # Principal Component Analysis
+        # mean = np.mean(point_dataset, axis=0)
+        # centered_dataset = point_dataset - mean
+        # cov_matrix = np.cov(centered_dataset, rowvar=False)
+        # pca = PCA()
+        # pca.fit(cov_matrix)
         
-        # Find the index of the axis with the smallest absolute eigenvalue
-        min_abs_eigenvalue_index = np.argmin(np.abs(np.linalg.eigvals(pca.components_)))
-        # Flip the sign of the corresponding axis
-        pca.components_[:, min_abs_eigenvalue_index] *= -1
+        # # Find the index of the axis with the smallest absolute eigenvalue
+        # min_abs_eigenvalue_index = np.argmin(np.abs(np.linalg.eigvals(pca.components_)))
+        # # Flip the sign of the corresponding axis
+        # pca.components_[:, min_abs_eigenvalue_index] *= -1
         
-        # Compute the dot product between each principal axis and the back-front direction
-        dot_products = np.abs(np.dot(pca.components_, x_hand))
+        # # Compute the dot product between each principal axis and the back-front direction
+        # dot_products = np.abs(np.dot(pca.components_, x_hand))
 
-        # Sort the principal axes based on the absolute dot product values
-        sorted_indices = np.argsort(dot_products)[::-1]
+        # # Sort the principal axes based on the absolute dot product values
+        # sorted_indices = np.argsort(dot_products)[::-1]
 
-        # Reassign the axes accordingly
-        sorted_axes = pca.components_[sorted_indices]
+        # # Reassign the axes accordingly
+        # sorted_axes = pca.components_[sorted_indices]
         
-        # Plot the principal axes
-        origin = mean
-        ax.scatter(mean[0], mean[1], mean[2])
-        ax.text(mean[0], mean[1], mean[2], 'mean')
+        # # Plot the principal axes
+        # origin = mean
+        # ax.scatter(mean[0], mean[1], mean[2])
+        # ax.text(mean[0], mean[1], mean[2], 'mean')
         
-        for axis in pca.components_.T:
-            ax.quiver(*origin, *axis, length=500)
-        
-        # Proposal 2
-        # # Axis 1: back -> front
-        # x_axis = x_hand
-        # x_center = np.array(list(self.cephalothoraxMarkers['back'])) + 0.5*x_hand
-        # x_axis /= width
-        
-        # # Orthogonal Distance Regression
-
-        
-        
-        # # # Finally, find y by cross product (z cross x)
-        # # y_axis =  np.cross(z_axis, x_axis)
-        
-        # # R = [x_axis, z_axis]
-        # # print(np.linalg.det(R))
-        # origin = x_center
-        # R = []
-        
-        # for axis in R:
+        # for axis in sorted_axes.T:
         #     ax.quiver(*origin, *axis, length=500)
+        
+        # # Proposal 2: Pure geometrical method
+        # Axis 1: back -> front
+        x_axis = x_hand
+        x_center = np.array(list(self.cephalothoraxMarkers['back'])) + 0.5*x_hand
+        x_axis /= width
+        
+        # Orthogonal Axis
+        z_hand /= height
+        z_axis = self.pure_geometrical(z_hand, x_axis)        
+        
+        # Finally, find y by cross product (z cross x)
+        y_axis =  np.cross(z_axis, x_axis)
+        
+        R = [x_axis, y_axis, z_axis]
+        print(np.linalg.det(R))
+        origin = x_center
+        
+        for axis in R:
+            ax.quiver(*origin, *axis, length=500)
                 
         plt.show()
 

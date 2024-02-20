@@ -769,14 +769,14 @@ class Spider:
         
         # Orthogonal Axis
         z_hand /= height
-        z_axis = self.pure_geometrical(z_hand, x_axis)        
+        z_axis = - self.pure_geometrical(z_hand, x_axis)        
         
         # Finally, find y by cross product (z cross x)
         y_axis =  np.cross(z_axis, x_axis)
         
         R = [x_axis, y_axis, z_axis]
         print(np.linalg.det(R))
-        origin = x_center
+        origin = np.mean(point_dataset, axis=0)
         
         for axis in R:
             ax.quiver(*origin, *axis, length=500)

@@ -669,17 +669,13 @@ class Spider:
         w /= np.linalg.norm(w)
         return w
         
-    def head_SoR(self):
+    def head_SoR(self, plot=False):
         ## Plot points ##
         # Create fig obj
-        fig = plt.figure()
-        ax = fig.add_subplot(projection='3d')
-        ax.view_init(elev=-160, azim=106)
-        
-        # Switch left & right (human error)
-        left_value = self.cephalothoraxMarkers['left']
-        self.cephalothoraxMarkers['left'] = self.cephalothoraxMarkers['right']
-        self.cephalothoraxMarkers['right'] = left_value 
+        if plot:
+            fig = plt.figure()
+            ax = fig.add_subplot(projection='3d')
+            ax.view_init(elev=-160, azim=106)
         
         # Read all markers
         n_marker = len(self.cephalothoraxMarkers)
@@ -690,31 +686,33 @@ class Spider:
         
         # For each marker, plot a different color
         for i in range(n_marker):
-            ax.scatter(self.cephalothoraxMarkers[marker_type[i]][0], 
-                       self.cephalothoraxMarkers[marker_type[i]][1], 
-                       self.cephalothoraxMarkers[marker_type[i]][2],
-                       color = marker_color[i])
-            ax.text(self.cephalothoraxMarkers[marker_type[i]][0], 
-                    self.cephalothoraxMarkers[marker_type[i]][1], 
-                    self.cephalothoraxMarkers[marker_type[i]][2],
-                    marker_type[i])
+            if plot:
+                ax.scatter(self.cephalothoraxMarkers[marker_type[i]][0], 
+                        self.cephalothoraxMarkers[marker_type[i]][1], 
+                        self.cephalothoraxMarkers[marker_type[i]][2],
+                        color = marker_color[i])
+                ax.text(self.cephalothoraxMarkers[marker_type[i]][0], 
+                        self.cephalothoraxMarkers[marker_type[i]][1], 
+                        self.cephalothoraxMarkers[marker_type[i]][2],
+                        marker_type[i])
             point_dataset.append(list(self.cephalothoraxMarkers[marker_type[i]]))
         
         point_dataset = np.array(point_dataset)            
         
-        # Plot axes
-        # (x) back -> top
-        ax.plot([self.cephalothoraxMarkers['back'][0], self.cephalothoraxMarkers['front'][0]], 
-                [self.cephalothoraxMarkers['back'][1], self.cephalothoraxMarkers['front'][1]],
-                [self.cephalothoraxMarkers['back'][2], self.cephalothoraxMarkers['front'][2]], 'r')
-        # (z) bottom -> top
-        ax.plot([self.cephalothoraxMarkers['bottom'][0], self.cephalothoraxMarkers['top'][0]], 
-                [self.cephalothoraxMarkers['bottom'][1], self.cephalothoraxMarkers['top'][1]],
-                [self.cephalothoraxMarkers['bottom'][2], self.cephalothoraxMarkers['top'][2]], 'b')
-        # (y) right -> left
-        ax.plot([self.cephalothoraxMarkers['right'][0], self.cephalothoraxMarkers['left'][0]], 
-                [self.cephalothoraxMarkers['right'][1], self.cephalothoraxMarkers['left'][1]],
-                [self.cephalothoraxMarkers['right'][2], self.cephalothoraxMarkers['left'][2]], 'g')
+        if plot:
+            # Plot axes
+            # (x) back -> top
+            ax.plot([self.cephalothoraxMarkers['back'][0], self.cephalothoraxMarkers['front'][0]], 
+                    [self.cephalothoraxMarkers['back'][1], self.cephalothoraxMarkers['front'][1]],
+                    [self.cephalothoraxMarkers['back'][2], self.cephalothoraxMarkers['front'][2]], 'r')
+            # (z) bottom -> top
+            ax.plot([self.cephalothoraxMarkers['bottom'][0], self.cephalothoraxMarkers['top'][0]], 
+                    [self.cephalothoraxMarkers['bottom'][1], self.cephalothoraxMarkers['top'][1]],
+                    [self.cephalothoraxMarkers['bottom'][2], self.cephalothoraxMarkers['top'][2]], 'b')
+            # (y) right -> left
+            ax.plot([self.cephalothoraxMarkers['right'][0], self.cephalothoraxMarkers['left'][0]], 
+                    [self.cephalothoraxMarkers['right'][1], self.cephalothoraxMarkers['left'][1]],
+                    [self.cephalothoraxMarkers['right'][2], self.cephalothoraxMarkers['left'][2]], 'g')
         
         ## Create 3D Rectangle ##
         
@@ -725,9 +723,10 @@ class Spider:
         z_hand = np.array(list(self.cephalothoraxMarkers['top'])) - np.array(list(self.cephalothoraxMarkers['bottom']))
         height = np.linalg.norm(z_hand)
 
-        ax.set_xlabel('X [pixel]')
-        ax.set_ylabel('Y [pixel]')
-        ax.set_zlabel('Z [n° layer]')
+        if plot:
+            ax.set_xlabel('X [pixel]')
+            ax.set_ylabel('Y [pixel]')
+            ax.set_zlabel('Z [n° layer]')
         
         # # Proposal 1: PCA
         # # Advantages: the best method to have a reference system with minimal differences
@@ -764,7 +763,7 @@ class Spider:
         # # Proposal 2: Pure geometrical method
         # Axis 1: back -> front
         x_axis = x_hand
-        x_center = np.array(list(self.cephalothoraxMarkers['back'])) + 0.5*x_hand
+        # x_center = np.array(list(self.cephalothoraxMarkers['back'])) + 0.5*x_hand
         x_axis /= width
         
         # Orthogonal Axis
@@ -774,14 +773,25 @@ class Spider:
         # Finally, find y by cross product (z cross x)
         y_axis =  np.cross(z_axis, x_axis)
         
-        R = [x_axis, y_axis, z_axis]
-        print(np.linalg.det(R))
-        origin = np.mean(point_dataset, axis=0)
+        # Compose SO(3) group
+        R = np.array([x_axis, y_axis, z_axis])
+        # Origin as the center marker
+        origin = list(self.cephalothoraxMarkers['center'])
         
-        for axis in R:
-            ax.quiver(*origin, *axis, length=500)
+        if plot:
+            # Visualizing
+            for axis in R:
+                ax.quiver(*origin, *axis, length=500)
                 
-        plt.show()
+        # Composing SE(3) group
+        R = R.T
+        T = np.concatenate((R, np.array([origin]).T), axis=1)
+        T = np.concatenate((T, np.array([[0, 0, 0, 1]])), axis=0)
+            
+        if plot:    
+            plt.show()
+
+        return T
 
     def save(self, filename, type="pickle"):
         """
@@ -907,14 +917,46 @@ class Spider:
             self.eyes[eye].StandardOrientationRetinaCloud = trimesh.points.PointCloud(self.eyes[eye].StandardOrientationRetinaPoints)
 
         self.cephalothoraxMarkers = data["cephalothorax"]["Original"]
+        
+        # Switch left & right (human error)
+        left_value = self.cephalothoraxMarkers['left']
+        self.cephalothoraxMarkers['left'] = self.cephalothoraxMarkers['right']
+        self.cephalothoraxMarkers['right'] = left_value 
+        
         points = []
         for marker in self.cephalothoraxMarkers:
             points.append(self.cephalothoraxMarkers[marker])
         self.cephalothoraxCloud = trimesh.points.PointCloud(points)
         self.StandardOrientationCephalothoraxPoints = data["cephalothorax"]["Rotated"]
         
-        self.head_SoR()
+        # Compute the SoR of the Head
+        # This matrix maps: global (camera) -> local (spider)
+        spider_SoR = np.linalg.inv(self.head_SoR())    # [4, 4] \in SE(3)
+        
+        # # Remap the markers
+        # self.cephalothoraxCloud.apply_transform(spider_SoR)
 
+        # # Uncomment for visualization        
+        # fig = plt.figure()
+        # ax = fig.add_subplot(projection='3d')
+        
+        # marker_name = list(self.cephalothoraxMarkers.keys())
+        # # Plot Markers
+        # for i in range(len(marker_name)):
+        #     ax.scatter(self.cephalothoraxCloud.vertices[i][0],
+        #                self.cephalothoraxCloud.vertices[i][1],
+        #                self.cephalothoraxCloud.vertices[i][2])
+        #     ax.text(self.cephalothoraxCloud.vertices[i][0],
+        #             self.cephalothoraxCloud.vertices[i][1],
+        #             self.cephalothoraxCloud.vertices[i][2],
+        #             marker_name[i])
+        
+        # R = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+        # origin = [0, 0, 0]
+        # for axis in R:
+        #     ax.quiver(*origin, *axis, length=500)
+        
+        # plt.show()
         print(" Done")
 
     def plot(

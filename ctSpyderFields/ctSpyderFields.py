@@ -931,10 +931,10 @@ class Spider:
         
         # Compute the SoR of the Head
         # This matrix maps: global (camera) -> local (spider)
-        spider_SoR = np.linalg.inv(self.head_SoR())    # [4, 4] \in SE(3)
+        spider_SoR = np.linalg.inv(self.head_SoR(plot=False))    # [4, 4] \in SE(3)
         
-        # # Remap the markers
-        # self.cephalothoraxCloud.apply_transform(spider_SoR)
+        # Remap the markers
+        self.cephalothoraxCloud.apply_transform(spider_SoR)
 
         # # Uncomment for visualization        
         # fig = plt.figure()

@@ -628,7 +628,7 @@ class Spider:
                 tmpdots = []
                 for label in tqdm(self.SeparateLabelPictures["Markers"][marker], desc="finding " + marker + " points"):  # for every slice
                     # find pixels with the determined color and set them as 1, all else as 0
-                    tmpdots.append(cv2.inRange(label, self.colors["Markers"][marker]["low_color"], self.colors["Markers"][marker]["high_color"]))
+                    tmpdots.append(cv2.inRange(label, np.array(self.colors["Markers"][marker]["low_color"]), np.array(self.colors["Markers"][marker]["high_color"])))
                 tmpdots = np.array(tmpdots)
                 dots = np.argwhere(tmpdots > 0)
             self.cephalothoraxMarkers[marker] = (

@@ -15,9 +15,6 @@ import yaml
 ### PLOTTING
 import matplotlib.pyplot as plt
 
-## PCA
-from sklearn.decomposition import PCA
-
 ### Exceptions ###
 class UnrecognizedEye(Exception):
     pass
@@ -631,7 +628,7 @@ class Spider:
                 tmpdots = []
                 for label in tqdm(self.SeparateLabelPictures["Markers"][marker], desc="finding " + marker + " points"):  # for every slice
                     # find pixels with the determined color and set them as 1, all else as 0
-                    tmpdots.append(cv2.inRange(label, self.colors[marker]["low_color"], self.colors[marker]["high_color"]))
+                    tmpdots.append(cv2.inRange(label, self.colors["Markers"][marker]["low_color"], self.colors["Markers"][marker]["high_color"]))
                 tmpdots = np.array(tmpdots)
                 dots = np.argwhere(tmpdots > 0)
             self.cephalothoraxMarkers[marker] = (
@@ -998,6 +995,18 @@ class Spider:
         
         # plt.show()
         print(" Done")
+
+    #TODO
+    def calculate_eyes_spans(
+            self,
+            eyes=("AME", "ALE", "PME", "PLE"),
+            mirror='True'
+    ):
+        if "AME" in eyes and "AME" in self.available_eyes:
+            outlinePoints = self.eyes["AME"].FOVcontourPoints
+            # Horizontal span
+            outlinePoints
+
 
     def plot(
         self,

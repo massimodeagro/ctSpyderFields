@@ -18,8 +18,8 @@ path = '../Data/Philaeus-chrysops/'
 PhilaeusChrysops = ctSpyderFields.Spider(workdir=path, voxelsize=0.003)
 PhilaeusChrysops.load(filename='PhilaeusChrysops', type='pickle')
 PhilaeusChrysops.compute_eyes()
-PhilaeusChrysops.orient_to_standard()
-# PhilaeusChrysops.from_std_to_head()
+# PhilaeusChrysops.orient_to_standard()
+PhilaeusChrysops.from_std_to_head()
 
 PhilaeusChrysops.project_retinas_full(field_mm=150)
 

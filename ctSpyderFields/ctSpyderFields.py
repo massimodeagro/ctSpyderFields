@@ -642,6 +642,8 @@ class Spider:
             allpoints.append(self.cephalothoraxMarkers[marker])
         self.cephalothoraxCloud = trimesh.points.PointCloud(allpoints)
 
+
+    #it seems that this now needs dropping
     def orient_to_standard(self):
         hom_matrix = self.cephalothoraxCloud.convex_hull.principal_inertia_transform
 

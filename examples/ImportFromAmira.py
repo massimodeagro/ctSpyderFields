@@ -6,8 +6,8 @@ from ctSpyderFields import ctSpyderFields
 import numpy as np
 
 
-path = '/path/to/images/'
-paramspath = '/path/to/params/params.yaml'
+path = '/home/massimodeagro/CTspyderFields/ctSpyderFields/Data/PirataPiratacus/'
+paramspath = '/home/massimodeagro/CTspyderFields/ctSpyderFields/examples/params.yaml'
 
 labelnames = {'AME': {'Lens': 'Lens_AME', 'Retina': 'Retina_AME'},
                   'ALE': {'Lens': 'Lens_ALE', 'Retina': 'Retina_ALE'},
@@ -23,7 +23,8 @@ GenusSpecies.load_all_labels_split(style='color')
 GenusSpecies.find_eyes_points(style='color')
 GenusSpecies.compute_cephalothorax(style='color')
 GenusSpecies.compute_eyes()
-GenusSpecies.orient_to_standard()
+# GenusSpecies.orient_to_standard()
+GenusSpecies.from_std_to_head()
 
 GenusSpecies.project_retinas_full(field_mm=150)
 GenusSpecies.save(filename='GenusSpecies')

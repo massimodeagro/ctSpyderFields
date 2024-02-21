@@ -15,6 +15,9 @@ import yaml
 ### PLOTTING
 import matplotlib.pyplot as plt
 
+## PCA
+from sklearn.decomposition import PCA
+
 ### Exceptions ###
 class UnrecognizedEye(Exception):
     pass
@@ -154,13 +157,14 @@ class Eye:
     def align_to_zero(self):
         """
         This formula rotates both the retina points and the lens points according to the rotation-translation
-        matrix found by pointcloud of retina, in order to align everything to the standard axis
+        matrix found by pointcloud of lens, in order to align everything to the standard axis
         """
         # Notation: # 
         # Rotation Matrix is a 3x3 matrix (SO(3) group) that expresses a Rotation
         # Homogeneous Matrix is a 4x4 matrix (SE(3) group) that expresses a Roto-translation
 
         hom_matrix = self.LensCloud.convex_hull.principal_inertia_transform
+        # principal_inertia_transform maps points in {Camera} frame in {Lens} frame
 
         self.RotatedLensPoints = trimesh.transform_points(
             self.LensPoints, hom_matrix
@@ -170,6 +174,7 @@ class Eye:
             self.RetinaPoints, hom_matrix
         )
         self.RotatedRetinaCloud = trimesh.points.PointCloud(self.RotatedRetinaPoints)
+        ### The points expressed in SoR {Camera} are expressed now in the {Lens} SoR
 
     def find_split_plane(self):
         """
@@ -177,6 +182,9 @@ class Eye:
         as well as on which side of the two is the retina and on which is the lens.
         This is needed for finding the cap of the lens.
         """
+
+        # The cap of the lens is the part of the lens convex_hull that is the farthest
+        # respect to the Retina
 
         LensSpanX = (
             max(self.RotatedLensCloud.vertices[:, 0]),
@@ -224,9 +232,8 @@ class Eye:
                     mask = self.RotatedLensCloud.convex_hull.vertices[:, 2] > 0
                 else:
                     mask = self.RotatedLensCloud.convex_hull.vertices[:, 2] < 0
-            self.RotatedLensSurfacePoints = self.RotatedLensCloud.convex_hull.vertices[
-                mask, :
-            ]
+            
+            self.RotatedLensSurfacePoints = self.RotatedLensCloud.convex_hull.vertices[mask, :]
         else:
             print("cry")  # TODO: do a better error catching process
             pass
@@ -294,24 +301,16 @@ class Eye:
             trimesh.transform_points([self.RotatedLensSphere[1]], homMatrix)[0],
         )
 
-    def orientToStandard(self, rotationMatrix):
+    def orientToStandard(self, hom_matrix):
         print(f'Reorienting {self.EyeIdentity} dots...', end='')
-        self.StandardOrientationLensPoints = trimesh.transform_points(
-            self.LensPoints, rotationMatrix
-        )
-        self.StandardOrientationLensCloud = trimesh.points.PointCloud(
-            self.StandardOrientationLensPoints
-        )
-        self.StandardOrientationRetinaPoints = trimesh.transform_points(
-            self.RetinaPoints, rotationMatrix
-        )
-        self.StandardOrientationRetinaCloud = trimesh.points.PointCloud(
-            self.StandardOrientationRetinaPoints
-        )
-        self.StandardOrientationLensSphere = (
-            self.LensSphere[0],
-            trimesh.transform_points([self.LensSphere[1]], rotationMatrix)[0],
-        )
+        # Lens
+        self.StandardOrientationLensPoints = trimesh.transform_points(self.LensPoints, hom_matrix)
+        self.StandardOrientationLensCloud = trimesh.points.PointCloud(self.StandardOrientationLensPoints)
+        # Retina
+        self.StandardOrientationRetinaPoints = trimesh.transform_points(self.RetinaPoints, hom_matrix)
+        self.StandardOrientationRetinaCloud = trimesh.points.PointCloud(self.StandardOrientationRetinaPoints)
+        # Lens Sphere
+        self.StandardOrientationLensSphere = (self.LensSphere[0], trimesh.transform_points([self.LensSphere[1]], hom_matrix)[0], )
         print(' Done')
 
     def project_retina(self, visual_field_radius):
@@ -355,6 +354,8 @@ class Eye:
 
         print(f"Projecting {self.EyeIdentity} retina...", end="")
         self.StandardOrientationProjectedVectorsFull = []
+
+        # s = sphere's center
         sx = self.StandardOrientationLensSphere[1][0]
         sy = self.StandardOrientationLensSphere[1][1]
         sz = self.StandardOrientationLensSphere[1][2]
@@ -362,30 +363,18 @@ class Eye:
             rx = point[0]
             ry = point[1]
             rz = point[2]
-            v = (sx - rx, sy - ry, sz - rz)
-            vmag = np.sqrt(v[0] ** 2 + v[1] ** 2 + v[2] ** 2)
-            vu = (v[0] / vmag, v[1] / vmag, v[2] / vmag)
+            # Compute distance between every point of retina with
+            # the center of the lens sphere
+            v = (rx - sx, ry - sy, rz - sz)
+            v_norm = np.linalg.norm(v)
+            vu = (v[0] / v_norm, v[1] / v_norm, v[2] / v_norm)
 
             """Ray/sphere intersection, from https://gist.github.com/thegedge/4769985"""
-            vuflip = np.multiply(
-                vu, -1
-            )  # I have no idea why, but data is wrong with the vector as calculated above, needs to be pointing in the other direction
-            r = visual_field_radius
-            dDotR0 = np.dot(vuflip, point)
-            t = -dDotR0 - (dDotR0 * dDotR0 - np.dot(point, point) + r * r) ** 0.5
+            dDotR0 = np.dot(vu, point)
+            t = -dDotR0 - (dDotR0 * dDotR0 - np.dot(point, point) + visual_field_radius * visual_field_radius) ** 0.5
 
-            self.StandardOrientationProjectedVectorsFull.append(
-                [
-                    point,
-                    vuflip,
-                    (
-                        point[0] + t * vuflip[0],
-                        point[1] + t * vuflip[1],
-                        point[2] + t * vuflip[2],
-                    ),
-                ]
-            )
-            self.focalLengthsFull.append([point, vmag])
+            self.StandardOrientationProjectedVectorsFull.append([point, vu, (point[0] + t * vu[0], point[1] + t * vu[1], point[2] + t * vu[2], ),])
+            self.focalLengthsFull.append([point, v_norm])
         print(' Done')
 
     def plane_slicer(self, plane, face, stepsize, tolerance):
@@ -654,20 +643,22 @@ class Spider:
         self.cephalothoraxCloud = trimesh.points.PointCloud(allpoints)
 
     def orient_to_standard(self):
-        rotationMatrix = self.cephalothoraxCloud.convex_hull.principal_inertia_transform
+        hom_matrix = self.cephalothoraxCloud.convex_hull.principal_inertia_transform
 
         # Rotate each eye
         for eye in self.available_eyes:
-            self.eyes[eye].orientToStandard(rotationMatrix)
+            self.eyes[eye].orientToStandard(hom_matrix)
 
         for marker in self.cephalothoraxMarkers:
-            self.StandardOrientationCephalothoraxPoints[
-                marker
-            ] = trimesh.transform_points(
-                [self.cephalothoraxMarkers[marker]], rotationMatrix
-            )[
-                0
-            ]
+            self.StandardOrientationCephalothoraxPoints[marker] = trimesh.transform_points([self.cephalothoraxMarkers[marker]], hom_matrix)[0]
+            
+    def from_std_to_head(self):
+        # Rotate each eye
+        for eye in self.available_eyes:
+            self.eyes[eye].orientToStandard(self.spider_SoR)
+
+        for marker in self.cephalothoraxMarkers:
+            self.StandardOrientationCephalothoraxPoints[marker] = trimesh.transform_points([self.cephalothoraxMarkers[marker]], self.spider_SoR)[0]
 
     def project_retinas(self, field_mm):
         # Project each retina
@@ -692,7 +683,153 @@ class Spider:
         for i in range(len(self.available_eyes)):
             self.eyes[list(self.available_eyes)[i]].find_field_contours(stepsizes[i], tolerances[i])
 
-        print(" Done")
+        print(" Done")        
+      
+    def pure_geometrical(self, u, v):
+        ### This value is obtained by:    ###
+        # w \in null(A)                     #
+        # where A = [v.T; cross(u, v).T]    #
+        # This condition means that the     #
+        # vector w is orthogonal with v     #
+        # and coplanar with u.              #
+        #####################################
+        
+        w = []
+        # w[0]
+        w.append((u[0]*(v[1]**2 + v[2]**2) - v[0]*(u[1]*v[1] + u[2]*v[2]))/(u[2]*(v[0]**2 + v[1]**2) - v[2]*(u[0]*v[0] + u[1]*v[1])))
+        # w[1]
+        w.append((u[1]*(v[0]**2 + v[2]**2) - v[1]*(u[0]*v[0] + u[2]*v[2]))/(u[2]*(v[0]**2 + v[1]**2) - v[2]*(u[0]*v[0] + u[1]*v[1])))
+        # w[2]
+        w.append(1.0)
+        w = np.array(w)
+        
+        # Normalizing
+        w /= np.linalg.norm(w)
+        return w
+        
+    def head_SoR(self, plot=False):
+        ## Plot points ##
+        # Create fig obj
+        if plot:
+            fig = plt.figure()
+            ax = fig.add_subplot(projection='3d')
+            ax.view_init(elev=-160, azim=106)
+        
+        # Read all markers
+        n_marker = len(self.cephalothoraxMarkers)
+        marker_type = list(self.cephalothoraxMarkers.keys())
+        marker_color = ['#323031', '#177E89', '#084C61', '#DB3A34', '#FFC857', '#FF9F1C', '#8ED081']
+        
+        point_dataset = []
+        
+        # For each marker, plot a different color
+        for i in range(n_marker):
+            if plot:
+                ax.scatter(self.cephalothoraxMarkers[marker_type[i]][0], 
+                        self.cephalothoraxMarkers[marker_type[i]][1], 
+                        self.cephalothoraxMarkers[marker_type[i]][2],
+                        color = marker_color[i])
+                ax.text(self.cephalothoraxMarkers[marker_type[i]][0], 
+                        self.cephalothoraxMarkers[marker_type[i]][1], 
+                        self.cephalothoraxMarkers[marker_type[i]][2],
+                        marker_type[i])
+            point_dataset.append(list(self.cephalothoraxMarkers[marker_type[i]]))
+        
+        point_dataset = np.array(point_dataset)            
+        
+        if plot:
+            # Plot axes
+            # (x) back -> top
+            ax.plot([self.cephalothoraxMarkers['back'][0], self.cephalothoraxMarkers['front'][0]], 
+                    [self.cephalothoraxMarkers['back'][1], self.cephalothoraxMarkers['front'][1]],
+                    [self.cephalothoraxMarkers['back'][2], self.cephalothoraxMarkers['front'][2]], 'r')
+            # (z) bottom -> top
+            ax.plot([self.cephalothoraxMarkers['bottom'][0], self.cephalothoraxMarkers['top'][0]], 
+                    [self.cephalothoraxMarkers['bottom'][1], self.cephalothoraxMarkers['top'][1]],
+                    [self.cephalothoraxMarkers['bottom'][2], self.cephalothoraxMarkers['top'][2]], 'b')
+            # (y) right -> left
+            ax.plot([self.cephalothoraxMarkers['right'][0], self.cephalothoraxMarkers['left'][0]], 
+                    [self.cephalothoraxMarkers['right'][1], self.cephalothoraxMarkers['left'][1]],
+                    [self.cephalothoraxMarkers['right'][2], self.cephalothoraxMarkers['left'][2]], 'g')
+        
+        ## Create 3D Rectangle ##
+        
+        x_hand = np.array(list(self.cephalothoraxMarkers['front'])) - np.array(list(self.cephalothoraxMarkers['back']))
+        width = np.linalg.norm(x_hand)
+        y_hand = np.array(list(self.cephalothoraxMarkers['left'])) - np.array(list(self.cephalothoraxMarkers['right']))
+        depth = np.linalg.norm(y_hand)
+        z_hand = np.array(list(self.cephalothoraxMarkers['top'])) - np.array(list(self.cephalothoraxMarkers['bottom']))
+        height = np.linalg.norm(z_hand)
+
+        if plot:
+            ax.set_xlabel('X [pixel]')
+            ax.set_ylabel('Y [pixel]')
+            ax.set_zlabel('Z [n° layer]')
+        
+        # # Proposal 1: PCA
+        # # Advantages: the best method to have a reference system with minimal differences
+        # # between the axes and the experimental points
+        # # Principal Component Analysis
+        # mean = np.mean(point_dataset, axis=0)
+        # centered_dataset = point_dataset - mean
+        # cov_matrix = np.cov(centered_dataset, rowvar=False)
+        # pca = PCA()
+        # pca.fit(cov_matrix)
+        
+        # # Find the index of the axis with the smallest absolute eigenvalue
+        # min_abs_eigenvalue_index = np.argmin(np.abs(np.linalg.eigvals(pca.components_)))
+        # # Flip the sign of the corresponding axis
+        # pca.components_[:, min_abs_eigenvalue_index] *= -1
+        
+        # # Compute the dot product between each principal axis and the back-front direction
+        # dot_products = np.abs(np.dot(pca.components_, x_hand))
+
+        # # Sort the principal axes based on the absolute dot product values
+        # sorted_indices = np.argsort(dot_products)[::-1]
+
+        # # Reassign the axes accordingly
+        # sorted_axes = pca.components_[sorted_indices]
+        
+        # # Plot the principal axes
+        # origin = mean
+        # ax.scatter(mean[0], mean[1], mean[2])
+        # ax.text(mean[0], mean[1], mean[2], 'mean')
+        
+        # for axis in sorted_axes.T:
+        #     ax.quiver(*origin, *axis, length=500)
+        
+        # # Proposal 2: Pure geometrical method
+        # Axis 1: back -> front
+        x_axis = x_hand
+        # x_center = np.array(list(self.cephalothoraxMarkers['back'])) + 0.5*x_hand
+        x_axis /= width
+        
+        # Orthogonal Axis
+        z_hand /= height
+        z_axis = - self.pure_geometrical(z_hand, x_axis)        
+        
+        # Finally, find y by cross product (z cross x)
+        y_axis =  np.cross(z_axis, x_axis)
+        
+        # Compose SO(3) group
+        R = np.array([x_axis, y_axis, z_axis])
+        # Origin as the center marker
+        origin = list(self.cephalothoraxMarkers['center'])
+        
+        if plot:
+            # Visualizing
+            for axis in R:
+                ax.quiver(*origin, *axis, length=500)
+                
+        # Composing SE(3) group
+        R = R.T
+        T = np.concatenate((R, np.array([origin]).T), axis=1)
+        T = np.concatenate((T, np.array([[0, 0, 0, 1]])), axis=0)
+            
+        if plot:    
+            plt.show()
+
+        return T
 
     def save(self, filename, type="pickle"):
         """
@@ -818,12 +955,46 @@ class Spider:
             self.eyes[eye].StandardOrientationRetinaCloud = trimesh.points.PointCloud(self.eyes[eye].StandardOrientationRetinaPoints)
 
         self.cephalothoraxMarkers = data["cephalothorax"]["Original"]
+        
+        # Switch left & right (human error)
+        left_value = self.cephalothoraxMarkers['left']
+        self.cephalothoraxMarkers['left'] = self.cephalothoraxMarkers['right']
+        self.cephalothoraxMarkers['right'] = left_value 
+        
         points = []
         for marker in self.cephalothoraxMarkers:
             points.append(self.cephalothoraxMarkers[marker])
         self.cephalothoraxCloud = trimesh.points.PointCloud(points)
         self.StandardOrientationCephalothoraxPoints = data["cephalothorax"]["Rotated"]
+        
+        # Compute the SoR of the Head
+        # This matrix maps: global (camera) -> local (spider)
+        self.spider_SoR = np.linalg.inv(self.head_SoR(plot=False))    # [4, 4] \in SE(3)
+        
+        # Remap the markers (Test)
+        # self.cephalothoraxCloud.apply_transform(self.spider_SoR)
 
+        # # Uncomment for visualization        
+        # fig = plt.figure()
+        # ax = fig.add_subplot(projection='3d')
+        
+        # marker_name = list(self.cephalothoraxMarkers.keys())
+        # # Plot Markers
+        # for i in range(len(marker_name)):
+        #     ax.scatter(self.cephalothoraxCloud.vertices[i][0],
+        #                self.cephalothoraxCloud.vertices[i][1],
+        #                self.cephalothoraxCloud.vertices[i][2])
+        #     ax.text(self.cephalothoraxCloud.vertices[i][0],
+        #             self.cephalothoraxCloud.vertices[i][1],
+        #             self.cephalothoraxCloud.vertices[i][2],
+        #             marker_name[i])
+        
+        # R = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+        # origin = [0, 0, 0]
+        # for axis in R:
+        #     ax.quiver(*origin, *axis, length=500)
+        
+        # plt.show()
         print(" Done")
 
     def plot(

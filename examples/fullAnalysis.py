@@ -4,7 +4,9 @@ Example script to compute a spider starting from saved pickle.
 # Sys to add the path
 import sys
 import os
-sys.path.insert(0, os.path.expanduser('~') + '/ctSpyderFields/ctSpyderFields')
+INTERNAL_PATH = '/spider_ws' + '/ctSpyderFields/ctSpyderFields'
+sys.path.append(os.path.expanduser('~') + INTERNAL_PATH)
+# sys.path.insert(0, os.path.expanduser('~') + INTERNAL_PATH)
 
 import ctSpyderFields
 import numpy as np
@@ -17,6 +19,7 @@ PhilaeusChrysops = ctSpyderFields.Spider(workdir=path, voxelsize=0.003)
 PhilaeusChrysops.load(filename='PhilaeusChrysops', type='pickle')
 PhilaeusChrysops.compute_eyes()
 PhilaeusChrysops.orient_to_standard()
+# PhilaeusChrysops.from_std_to_head()
 
 PhilaeusChrysops.project_retinas_full(field_mm=150)
 

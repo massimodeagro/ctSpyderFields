@@ -532,6 +532,10 @@ class Spider:
             },
         }
 
+        self.cephalothoraxCloud = None
+
+        self.spider_SoR = None
+
     '''
     
     LEGACY CODE. KEEP FOR NOW BUT TO TRASH
@@ -638,6 +642,10 @@ class Spider:
             )
             allpoints.append(self.cephalothoraxMarkers[marker])
         self.cephalothoraxCloud = trimesh.points.PointCloud(allpoints)
+
+        # Compute the SoR of the Head
+        # This matrix maps: global (camera) -> local (spider)
+        self.spider_SoR = np.linalg.inv(self.head_SoR(plot=False))    # [4, 4] \in SE(3)
 
 
     #it seems that this now needs dropping
@@ -908,6 +916,7 @@ class Spider:
                 "Original": self.cephalothoraxMarkers,
                 "Rotated": self.StandardOrientationCephalothoraxPoints,
             },
+            "SOR": self.spider_SoR
         }
         
         # Save into a file
@@ -954,46 +963,21 @@ class Spider:
             self.eyes[eye].StandardOrientationRetinaCloud = trimesh.points.PointCloud(self.eyes[eye].StandardOrientationRetinaPoints)
 
         self.cephalothoraxMarkers = data["cephalothorax"]["Original"]
-        
+
         # Switch left & right (human error)
         left_value = self.cephalothoraxMarkers['left']
         self.cephalothoraxMarkers['left'] = self.cephalothoraxMarkers['right']
-        self.cephalothoraxMarkers['right'] = left_value 
-        
+        self.cephalothoraxMarkers['right'] = left_value
+
         points = []
         for marker in self.cephalothoraxMarkers:
             points.append(self.cephalothoraxMarkers[marker])
         self.cephalothoraxCloud = trimesh.points.PointCloud(points)
         self.StandardOrientationCephalothoraxPoints = data["cephalothorax"]["Rotated"]
-        
-        # Compute the SoR of the Head
-        # This matrix maps: global (camera) -> local (spider)
-        self.spider_SoR = np.linalg.inv(self.head_SoR(plot=False))    # [4, 4] \in SE(3)
-        
-        # Remap the markers (Test)
-        # self.cephalothoraxCloud.apply_transform(self.spider_SoR)
 
-        # # Uncomment for visualization        
-        # fig = plt.figure()
-        # ax = fig.add_subplot(projection='3d')
-        
-        # marker_name = list(self.cephalothoraxMarkers.keys())
-        # # Plot Markers
-        # for i in range(len(marker_name)):
-        #     ax.scatter(self.cephalothoraxCloud.vertices[i][0],
-        #                self.cephalothoraxCloud.vertices[i][1],
-        #                self.cephalothoraxCloud.vertices[i][2])
-        #     ax.text(self.cephalothoraxCloud.vertices[i][0],
-        #             self.cephalothoraxCloud.vertices[i][1],
-        #             self.cephalothoraxCloud.vertices[i][2],
-        #             marker_name[i])
-        
-        # R = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
-        # origin = [0, 0, 0]
-        # for axis in R:
-        #     ax.quiver(*origin, *axis, length=500)
-        
-        # plt.show()
+        if 'SOR' in data:
+            self.spider_SoR = data['SOR']
+
         print(" Done")
 
     #TODO

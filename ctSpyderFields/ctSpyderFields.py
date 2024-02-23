@@ -14,6 +14,7 @@ import yaml
 
 ### PLOTTING
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 
 ### Exceptions ###
 class UnrecognizedEye(Exception):
@@ -459,6 +460,55 @@ class Eye:
                     if len(side) > 0:
                         tomerge.append(side)
         self.FOVcontourPoints = np.unique(np.concatenate(tomerge), axis=0)
+    def calculate_span(self, visual_field_radius, voxel_size):
+        outlinePoints = self.FOVcontourPoints
+
+        transversePlanePoints = np.delete(outlinePoints, 2, 1)
+        transversePlaneDistances = np.sqrt(transversePlanePoints[:, 0] * transversePlanePoints[:, 0] +
+                                           transversePlanePoints[:, 1] * transversePlanePoints[:, 1])
+        transverseArgsPointsOnPlane = np.where(
+            np.logical_and(transversePlaneDistances >= (visual_field_radius / voxel_size) * 0.95,
+                           transversePlaneDistances <= (visual_field_radius / voxel_size) * 1))
+        transverseAngles = np.rad2deg(np.arctan(transversePlanePoints[:, 1] / transversePlanePoints[:, 0]))
+        transverseAnglesOnPlane = transverseAngles[transverseArgsPointsOnPlane]
+        if len(transverseAnglesOnPlane) > 0:
+            transverseSpan = [np.round(np.min(transverseAnglesOnPlane), 3),
+                              np.round(np.max(transverseAnglesOnPlane), 3)]
+            transverseArgSpan = [np.argmin(transverseAnglesOnPlane), np.argmax(transverseAnglesOnPlane)]
+        else:
+            transverseSpan = [None, None]
+
+        coronalPlanePoints = np.delete(outlinePoints, 0, 1)
+        coronalPlaneDistances = np.sqrt(coronalPlanePoints[:, 0] * coronalPlanePoints[:, 0] +
+                                        coronalPlanePoints[:, 1] * coronalPlanePoints[:, 1])
+        coronalArgsPointsOnPlane = np.where(
+            np.logical_and(coronalPlaneDistances >= (visual_field_radius / voxel_size) * 0.95,
+                           coronalPlaneDistances <= (visual_field_radius / voxel_size) * 1.2))
+        coronalAngles = np.rad2deg(np.arctan(coronalPlanePoints[:, 1] / coronalPlanePoints[:, 0]))
+        coronalAnglesOnPlane = coronalAngles[coronalArgsPointsOnPlane]
+        if len(coronalAnglesOnPlane) > 0:
+            coronalSpan = [np.round(np.min(coronalAnglesOnPlane), 3),
+                           np.round(np.max(coronalAnglesOnPlane), 3)]
+            coronalArgSpan = [np.argmin(coronalAnglesOnPlane), np.argmax(coronalAnglesOnPlane)]
+        else:
+            coronalSpan = [None, None]
+
+        sagittalPlanePoints = np.delete(outlinePoints, 1, 1)
+        sagittalPlaneDistances = np.sqrt(sagittalPlanePoints[:, 0] * sagittalPlanePoints[:, 0] +
+                                         sagittalPlanePoints[:, 1] * sagittalPlanePoints[:, 1])
+        sagittalArgsPointsOnPlane = np.where(
+            np.logical_and(sagittalPlaneDistances >= (visual_field_radius / voxel_size) * 0.95,
+                           sagittalPlaneDistances <= (visual_field_radius / voxel_size) * 1.2))
+        sagittalAngles = np.rad2deg(np.arctan(sagittalPlanePoints[:, 1] / sagittalPlanePoints[:, 0]))
+        sagittalAnglesOnPlane = sagittalAngles[sagittalArgsPointsOnPlane]
+        if len(sagittalAnglesOnPlane) > 0:
+            sagittalSpan = [np.round(np.min(sagittalAnglesOnPlane), 3),
+                            np.round(np.max(sagittalAnglesOnPlane), 3)]
+            sagittalArgSpan = [np.argmin(sagittalAnglesOnPlane), np.argmax(sagittalAnglesOnPlane)]
+        else:
+            sagittalSpan = [None, None]
+
+        return {'Transverse': transverseSpan, 'Coronal': coronalSpan, 'Sagittal': sagittalSpan}
 
 class Spider:
     """
@@ -980,19 +1030,20 @@ class Spider:
 
         print(" Done")
 
-    #TODO
+    #TODO this is just general. maybe we could do it planewise (all parallel transverse/coronal/sagittal planes spans)
     def calculate_eyes_spans(
             self,
-            eyes=("AME", "ALE", "PME", "PLE"),
-            mirror='True'
+            field_radius,
+            eyes=("AME", "ALE", "PME", "PLE")
     ):
-        if "AME" in eyes and "AME" in self.available_eyes:
-            outlinePoints = self.eyes["AME"].FOVcontourPoints
-            # Horizontal span
-            outlinePoints
+        spans = dict.fromkeys(eyes, None)
 
+        for eye in eyes:
+            spans[eye] = self.eyes[eye].calculate_span(visual_field_radius=field_radius,
+                                                       voxel_size=self.voxelSize)
+        return spans
 
-    def plot(
+    def plot_matplotlib(
         self,
         eyes=("AME", "ALE", "PME", "PLE"),
         elements=("lens", "retina", "projection", "projection_full", "FOVoutline"),
@@ -1156,3 +1207,32 @@ class Spider:
             ax.plot_wireframe(x, y, z, linewidth=0.50, color="black")
 
         plt.show()
+
+    def plot_pyplot(
+        self,
+        eyes=("AME", "ALE", "PME", "PLE"),
+        elements=("lens", "retina", "projection", "projection_full", "FOVoutline", "planes"),
+        plot_FOV_sphere=True,
+        field_mm=150,
+        alpha=1
+    ):
+        toplot = []
+        if plot_FOV_sphere:
+            u, v = np.mgrid[0:2 * np.pi:50j, 0:np.pi:50j]
+            x = field_mm / self.voxelSize * np.cos(u) * np.sin(v)
+            y = field_mm / self.voxelSize * np.sin(u) * np.sin(v)
+            z = field_mm / self.voxelSize * np.cos(v)
+
+            sphere = go.Surface(x=x, y=y, z=z, opacity=0.7, colorscale=[[0, 'white'], [1, 'white']],
+                                showscale=False)
+            toplot.append(sphere)
+
+        for eye in eyes:
+            if "FOVoutline" in elements:
+                # Compact Form
+                Outline = self.eyes[eye].FOVcontourPoints
+                dots = go.Scatter3d(x=Outline[:, 0], y=Outline[:, 1], z=Outline[:, 2],
+                                     mode='markers', marker={'color': 'purple', 'size': 2})
+                toplot.append(dots)
+        fig = go.Figure(data=toplot)
+        fig.show()

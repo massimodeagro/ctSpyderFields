@@ -1,6 +1,6 @@
-# ctSpyderFields Devel Branch
+# ctSpyderFields
 Python package that project retinas through lenses as segmented from micro CT scans (Amira, Dragonfly) of spiders.
-**[WARNING]**: This branch is for developing. The code is unstable.
+**[WARNING]**: This package is under developing. The code is unstable.
 
 ## How to install the package
 **Step 0**: Download the package.

@@ -14,9 +14,7 @@ import yaml
 
 ### PLOTTING
 import matplotlib.pyplot as plt
-
-## PCA
-from sklearn.decomposition import PCA
+import plotly.graph_objects as go
 
 ### Exceptions ###
 class UnrecognizedEye(Exception):
@@ -35,14 +33,12 @@ class Eye:
     all the data for each eye
     """
 
-    def __init__(self, eye_identity: str):
+    def __init__(self, eye_identity: str, params):
         """
         :param eye_identity: one of AME, ALE, PME, PLE
         """
         # Extract Parameters from YAML file
         # Debug
-        with open('../ctSpyderFields/params.yaml', 'r') as file:
-            params = yaml.safe_load(file)
 
         ## Standardized Data        
         # New Method | More Robust and compact
@@ -83,6 +79,7 @@ class Eye:
         self.focalLengthsFull = []
         self.FOVcontourPoints = None
 
+    '''
     def amira_find_lens_points(self, labels_pictures_list):
         """
         this formula takes the list of label pictures and threshold it based on
@@ -123,12 +120,27 @@ class Eye:
         """
         self.amira_find_lens_points(labels_pictures_list)
         self.amira_find_retinas_points(labels_pictures_list)
+    '''
 
-    def dragonfly_find_points(self, piclist, part="Lens"):
-        if part == "Lens":
-            self.LensPoints = np.argwhere(np.array(piclist) > 0)
-        elif part == "Retina":
-            self.RetinaPoints = np.argwhere(np.array(piclist) > 0)
+    def find_points(self, piclist, part="Lens", style='binary'):
+        if style == 'binary':
+            if part == "Lens":
+                self.LensPoints = np.argwhere(np.array(piclist) > 0)
+            elif part == "Retina":
+                self.RetinaPoints = np.argwhere(np.array(piclist) > 0)
+        elif style== 'color':
+            if part == "Lens":
+                for label in tqdm(piclist, desc="finding " + self.EyeIdentity + " Lens"):  # for every slice
+                    # find pixels with the determined color and set them as 1, all else as 0
+                    self.LensMask.append(cv2.inRange(label, self.LensColor[0], self.LensColor[1]))
+                self.LensMask = np.array(self.LensMask)
+                self.LensPoints = np.argwhere(self.LensMask > 0)
+            elif part == "Retina":
+                for label in tqdm(piclist, desc="finding " + self.EyeIdentity + " Retina"):  # for every slice
+                    # find pixels with the determined color and set them as 1, all else as 0
+                    self.RetinaMask.append(cv2.inRange(label, self.RetinaColor[0], self.RetinaColor[1]))
+                self.RetinaMask = np.array(self.RetinaMask)
+                self.RetinaPoints = np.argwhere(self.RetinaMask > 0)
 
     def define_lens_cloud(self):
         self.LensCloud = trimesh.points.PointCloud(self.LensPoints)
@@ -448,6 +460,55 @@ class Eye:
                     if len(side) > 0:
                         tomerge.append(side)
         self.FOVcontourPoints = np.unique(np.concatenate(tomerge), axis=0)
+    def calculate_span(self, visual_field_radius, voxel_size):
+        outlinePoints = self.FOVcontourPoints
+
+        transversePlanePoints = np.delete(outlinePoints, 2, 1)
+        transversePlaneDistances = np.sqrt(transversePlanePoints[:, 0] * transversePlanePoints[:, 0] +
+                                           transversePlanePoints[:, 1] * transversePlanePoints[:, 1])
+        transverseArgsPointsOnPlane = np.where(
+            np.logical_and(transversePlaneDistances >= (visual_field_radius / voxel_size) * 0.95,
+                           transversePlaneDistances <= (visual_field_radius / voxel_size) * 1))
+        transverseAngles = np.rad2deg(np.arctan(transversePlanePoints[:, 1] / transversePlanePoints[:, 0]))
+        transverseAnglesOnPlane = transverseAngles[transverseArgsPointsOnPlane]
+        if len(transverseAnglesOnPlane) > 0:
+            transverseSpan = [np.round(np.min(transverseAnglesOnPlane), 3),
+                              np.round(np.max(transverseAnglesOnPlane), 3)]
+            transverseArgSpan = [np.argmin(transverseAnglesOnPlane), np.argmax(transverseAnglesOnPlane)]
+        else:
+            transverseSpan = [None, None]
+
+        coronalPlanePoints = np.delete(outlinePoints, 0, 1)
+        coronalPlaneDistances = np.sqrt(coronalPlanePoints[:, 0] * coronalPlanePoints[:, 0] +
+                                        coronalPlanePoints[:, 1] * coronalPlanePoints[:, 1])
+        coronalArgsPointsOnPlane = np.where(
+            np.logical_and(coronalPlaneDistances >= (visual_field_radius / voxel_size) * 0.95,
+                           coronalPlaneDistances <= (visual_field_radius / voxel_size) * 1.2))
+        coronalAngles = np.rad2deg(np.arctan(coronalPlanePoints[:, 1] / coronalPlanePoints[:, 0]))
+        coronalAnglesOnPlane = coronalAngles[coronalArgsPointsOnPlane]
+        if len(coronalAnglesOnPlane) > 0:
+            coronalSpan = [np.round(np.min(coronalAnglesOnPlane), 3),
+                           np.round(np.max(coronalAnglesOnPlane), 3)]
+            coronalArgSpan = [np.argmin(coronalAnglesOnPlane), np.argmax(coronalAnglesOnPlane)]
+        else:
+            coronalSpan = [None, None]
+
+        sagittalPlanePoints = np.delete(outlinePoints, 1, 1)
+        sagittalPlaneDistances = np.sqrt(sagittalPlanePoints[:, 0] * sagittalPlanePoints[:, 0] +
+                                         sagittalPlanePoints[:, 1] * sagittalPlanePoints[:, 1])
+        sagittalArgsPointsOnPlane = np.where(
+            np.logical_and(sagittalPlaneDistances >= (visual_field_radius / voxel_size) * 0.95,
+                           sagittalPlaneDistances <= (visual_field_radius / voxel_size) * 1.2))
+        sagittalAngles = np.rad2deg(np.arctan(sagittalPlanePoints[:, 1] / sagittalPlanePoints[:, 0]))
+        sagittalAnglesOnPlane = sagittalAngles[sagittalArgsPointsOnPlane]
+        if len(sagittalAnglesOnPlane) > 0:
+            sagittalSpan = [np.round(np.min(sagittalAnglesOnPlane), 3),
+                            np.round(np.max(sagittalAnglesOnPlane), 3)]
+            sagittalArgSpan = [np.argmin(sagittalAnglesOnPlane), np.argmax(sagittalAnglesOnPlane)]
+        else:
+            sagittalSpan = [None, None]
+
+        return {'Transverse': transverseSpan, 'Coronal': coronalSpan, 'Sagittal': sagittalSpan}
 
 class Spider:
     """
@@ -458,7 +519,8 @@ class Spider:
     def __init__(
         self,
         workdir,
-        dragonfly_label_names=None,
+        paramspath,
+        label_names=None,
         voxelsize=0.001,
         available_eyes: list = ["AME", "ALE", "PME", "PLE"],
     ):
@@ -473,10 +535,13 @@ class Spider:
         self.path = workdir
         self.available_eyes = available_eyes
 
+        with open(paramspath, 'r') as file:
+            self.colors = yaml.safe_load(file)
+
         ## New Version with a Dictionary
         self.eyes = {}
         for eye in self.available_eyes:
-            self.eyes[eye] = Eye(eye_identity=eye)
+            self.eyes[eye] = Eye(eye_identity=eye, params=self.colors)
 
         self.cephalothoraxMarkers = {
             "center": [],
@@ -498,10 +563,10 @@ class Spider:
             "right": [],
         }
 
-        self.AmiraLabelPictures = []
-        self.DragonflyLabelNames = dragonfly_label_names
+        self.FullLabelPictures = []
+        self.LabelNames = label_names
 
-        self.DragonflyLabelPictures = {
+        self.SeparateLabelPictures = {
             "AME": {"Lens": [], "Retina": []},
             "ALE": {"Lens": [], "Retina": []},
             "PME": {"Lens": [], "Retina": []},
@@ -517,7 +582,15 @@ class Spider:
             },
         }
 
-    def amira_load_labels(self):
+        self.cephalothoraxCloud = None
+
+        self.spider_SoR = None
+
+    '''
+    
+    LEGACY CODE. KEEP FOR NOW BUT TO TRASH
+    
+    def amira_load_full_labels(self):
         for file in tqdm(sorted(os.listdir(self.path)), desc="loading images"):
             self.AmiraLabelPictures.append(cv2.imread(self.path + file, 1))
 
@@ -525,8 +598,8 @@ class Spider:
         # Find Lens and Retina Points for each eye
         for eye in self.available_eyes:
             self.eyes[eye].amira_find_all_points(self.AmiraLabelPictures)
-
-    def dragonfly_load_label(self, labelname, group, object):
+    '''
+    def load_label_split(self, labelname, group, object, style='binary'):
         """
         This function pull all the pngs from workdir and load them according to file names
         provided in self.DragonflyLabelNames
@@ -540,29 +613,31 @@ class Spider:
             if file.startswith(labelname):
                 imagelist.append(file)
         for file in tqdm(sorted(imagelist), desc="loading " + labelname):
-            self.DragonflyLabelPictures[group][object].append(
-                cv2.imread(self.path + file, 0)
-            )
-
-    def dragonfly_load_all_labels(self):
+            if style=='binary':
+                self.SeparateLabelPictures[group][object].append(cv2.imread(self.path + file, 0))
+            elif style == 'color':
+                self.SeparateLabelPictures[group][object].append(cv2.imread(self.path + file, 1))
+    def load_all_labels_split(self,  style='binary'):
         """
         This function calls dragonfly_load_label for 4 + 7 times
         """
         for eye in self.available_eyes:
-            for label in self.DragonflyLabelNames[eye]:
-                self.dragonfly_load_label(
-                    labelname=self.DragonflyLabelNames[eye][label],
+            for label in self.LabelNames[eye]:
+                self.load_label_split(
+                    labelname=self.LabelNames[eye][label],
                     group=eye,
                     object=label,
+                    style=style
                 )
-        for marker in self.DragonflyLabelPictures["Markers"]:
-            self.dragonfly_load_label(
-                labelname=self.DragonflyLabelNames["Markers"][marker],
+        for marker in self.SeparateLabelPictures["Markers"]:
+            self.load_label_split(
+                labelname=self.LabelNames["Markers"][marker],
                 group="Markers",
                 object=marker,
+                style=style
             )
 
-    def dragonfly_find_eyes_points(self):
+    def find_eyes_points(self, style='binary'):
         """
         helper function to find all eyes at once. to see how points are found, look in class eyes, function dragonfly_find_points
         """
@@ -570,7 +645,7 @@ class Spider:
         for eye in self.available_eyes:
             print("finding " + eye + " points...")
             for blob in ["Lens", "Retina"]:
-                self.eyes[eye].dragonfly_find_points(piclist=self.DragonflyLabelPictures[eye][blob], part=blob)
+                self.eyes[eye].find_points(piclist=self.SeparateLabelPictures[eye][blob], part=blob, style=style)
 
     def compute_eye(self, eye):
         """
@@ -594,16 +669,22 @@ class Spider:
             self.compute_eye(eye)
         print(' Done')
 
-    def compute_cephalothorax(self):
+    def compute_cephalothorax(self, style='binary'):
         """
         this first translates the binary pictures in a set of points, and then find the center
         """
         allpoints = []
         for marker in self.cephalothoraxMarkers:
             print("finding " + marker + " points...")
-            dots = np.argwhere(
-                np.array(self.DragonflyLabelPictures["Markers"][marker]) > 0
-            )
+            if style == 'binary':
+                dots = np.argwhere(np.array(self.SeparateLabelPictures["Markers"][marker]) > 0)
+            elif style == 'color':
+                tmpdots = []
+                for label in tqdm(self.SeparateLabelPictures["Markers"][marker], desc="finding " + marker + " points"):  # for every slice
+                    # find pixels with the determined color and set them as 1, all else as 0
+                    tmpdots.append(cv2.inRange(label, np.array(self.colors["Markers"][marker]["low_color"]), np.array(self.colors["Markers"][marker]["high_color"])))
+                tmpdots = np.array(tmpdots)
+                dots = np.argwhere(tmpdots > 0)
             self.cephalothoraxMarkers[marker] = (
                 np.mean(dots[:, 0]),
                 np.mean(dots[:, 1]),
@@ -612,6 +693,12 @@ class Spider:
             allpoints.append(self.cephalothoraxMarkers[marker])
         self.cephalothoraxCloud = trimesh.points.PointCloud(allpoints)
 
+        # Compute the SoR of the Head
+        # This matrix maps: global (camera) -> local (spider)
+        self.spider_SoR = np.linalg.inv(self.head_SoR(plot=False))    # [4, 4] \in SE(3)
+
+
+    #it seems that this now needs dropping
     def orient_to_standard(self):
         hom_matrix = self.cephalothoraxCloud.convex_hull.principal_inertia_transform
 
@@ -879,6 +966,7 @@ class Spider:
                 "Original": self.cephalothoraxMarkers,
                 "Rotated": self.StandardOrientationCephalothoraxPoints,
             },
+            "SOR": self.spider_SoR
         }
         
         # Save into a file
@@ -925,49 +1013,37 @@ class Spider:
             self.eyes[eye].StandardOrientationRetinaCloud = trimesh.points.PointCloud(self.eyes[eye].StandardOrientationRetinaPoints)
 
         self.cephalothoraxMarkers = data["cephalothorax"]["Original"]
-        
+
         # Switch left & right (human error)
         left_value = self.cephalothoraxMarkers['left']
         self.cephalothoraxMarkers['left'] = self.cephalothoraxMarkers['right']
-        self.cephalothoraxMarkers['right'] = left_value 
-        
+        self.cephalothoraxMarkers['right'] = left_value
+
         points = []
         for marker in self.cephalothoraxMarkers:
             points.append(self.cephalothoraxMarkers[marker])
         self.cephalothoraxCloud = trimesh.points.PointCloud(points)
         self.StandardOrientationCephalothoraxPoints = data["cephalothorax"]["Rotated"]
-        
-        # Compute the SoR of the Head
-        # This matrix maps: global (camera) -> local (spider)
-        self.spider_SoR = np.linalg.inv(self.head_SoR(plot=False))    # [4, 4] \in SE(3)
-        
-        # Remap the markers (Test)
-        # self.cephalothoraxCloud.apply_transform(self.spider_SoR)
 
-        # # Uncomment for visualization        
-        # fig = plt.figure()
-        # ax = fig.add_subplot(projection='3d')
-        
-        # marker_name = list(self.cephalothoraxMarkers.keys())
-        # # Plot Markers
-        # for i in range(len(marker_name)):
-        #     ax.scatter(self.cephalothoraxCloud.vertices[i][0],
-        #                self.cephalothoraxCloud.vertices[i][1],
-        #                self.cephalothoraxCloud.vertices[i][2])
-        #     ax.text(self.cephalothoraxCloud.vertices[i][0],
-        #             self.cephalothoraxCloud.vertices[i][1],
-        #             self.cephalothoraxCloud.vertices[i][2],
-        #             marker_name[i])
-        
-        # R = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
-        # origin = [0, 0, 0]
-        # for axis in R:
-        #     ax.quiver(*origin, *axis, length=500)
-        
-        # plt.show()
+        if 'SOR' in data:
+            self.spider_SoR = data['SOR']
+
         print(" Done")
 
-    def plot(
+    #TODO this is just general. maybe we could do it planewise (all parallel transverse/coronal/sagittal planes spans)
+    def calculate_eyes_spans(
+            self,
+            field_radius,
+            eyes=("AME", "ALE", "PME", "PLE")
+    ):
+        spans = dict.fromkeys(eyes, None)
+
+        for eye in eyes:
+            spans[eye] = self.eyes[eye].calculate_span(visual_field_radius=field_radius,
+                                                       voxel_size=self.voxelSize)
+        return spans
+
+    def plot_matplotlib(
         self,
         eyes=("AME", "ALE", "PME", "PLE"),
         elements=("lens", "retina", "projection", "projection_full", "FOVoutline"),
@@ -1131,3 +1207,32 @@ class Spider:
             ax.plot_wireframe(x, y, z, linewidth=0.50, color="black")
 
         plt.show()
+
+    def plot_pyplot(
+        self,
+        eyes=("AME", "ALE", "PME", "PLE"),
+        elements=("lens", "retina", "projection", "projection_full", "FOVoutline", "planes"),
+        plot_FOV_sphere=True,
+        field_mm=150,
+        alpha=1
+    ):
+        toplot = []
+        if plot_FOV_sphere:
+            u, v = np.mgrid[0:2 * np.pi:50j, 0:np.pi:50j]
+            x = field_mm / self.voxelSize * np.cos(u) * np.sin(v)
+            y = field_mm / self.voxelSize * np.sin(u) * np.sin(v)
+            z = field_mm / self.voxelSize * np.cos(v)
+
+            sphere = go.Surface(x=x, y=y, z=z, opacity=0.7, colorscale=[[0, 'white'], [1, 'white']],
+                                showscale=False)
+            toplot.append(sphere)
+
+        for eye in eyes:
+            if "FOVoutline" in elements:
+                # Compact Form
+                Outline = self.eyes[eye].FOVcontourPoints
+                dots = go.Scatter3d(x=Outline[:, 0], y=Outline[:, 1], z=Outline[:, 2],
+                                     mode='markers', marker={'color': 'purple', 'size': 2})
+                toplot.append(dots)
+        fig = go.Figure(data=toplot)
+        fig.show()

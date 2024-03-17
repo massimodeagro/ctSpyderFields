@@ -22,7 +22,7 @@ GenusSpecies.spider_SoR = np.linalg.inv(GenusSpecies.head_SoR(plot=False))  # [4
 
 # # Usage of se2_from_two_points
 # p1 = np.array([1, 0])
-# p2 = np.array([0, 1])
+# p2 = np.array([1, 1])
 # test_2d_sor = GenusSpecies.se2_from_two_points(p1, p2)
 # # Transform from global to new reference
 # p2_local = np.dot(np.linalg.inv(test_2d_sor),(np.array([np.append(p2, 1)]).T))

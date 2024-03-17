@@ -1244,8 +1244,11 @@ class Spider:
     #     j_versor = distance/np.linalg.norm(distance)
 
     #     # Find the orthogonal
-    #     i_versor = np.array([1, -j_versor[1]/j_versor[0]])
-    #     i_versor /= np.linalg.norm(i_versor)
+    #     if j_versor[0] == 0:
+    #         i_versor = np.array([1, 0])
+    #     else:
+    #         i_versor = np.array([1, -j_versor[1]/j_versor[0]])
+    #         i_versor /= np.linalg.norm(i_versor)
 
     #     # Compose the SE(2) matrix
     #     rot_matrix2d = np.array([i_versor, j_versor]).T

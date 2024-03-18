@@ -14,6 +14,7 @@ import yaml
 
 ### PLOTTING
 import matplotlib.pyplot as plt
+from matplotlib import cm
 import plotly.graph_objects as go
 
 ### Exceptions ###
@@ -460,6 +461,7 @@ class Eye:
                     if len(side) > 0:
                         tomerge.append(side)
         self.FOVcontourPoints = np.unique(np.concatenate(tomerge), axis=0)
+    
     def calculate_span(self, visual_field_radius, voxel_size):
         outlinePoints = self.FOVcontourPoints
 
@@ -509,7 +511,119 @@ class Eye:
             sagittalSpan = [None, None]
 
         return {'Transverse': transverseSpan, 'Coronal': coronalSpan, 'Sagittal': sagittalSpan}
+    
+    def cartesian2spherical(self, cartesian_point):
+        """
+            Input:
+            Cartesian Point: [x, y, z] (list)
+            Output:
+            Spherical Point: [rho, theta (azimuth), phi (elevation)] (list)
+        """
+        rho = np.sqrt(cartesian_point[0]*cartesian_point[0] + cartesian_point[1]*cartesian_point[1] + cartesian_point[2]*cartesian_point[2])
+        theta = np.arctan2(cartesian_point[1], cartesian_point[0])
+        phi = np.arctan2(cartesian_point[2], np.sqrt(cartesian_point[0]*cartesian_point[0] + cartesian_point[1]*cartesian_point[1]))
 
+        return [rho, theta, phi]
+
+    def calculate_span2(self, visual_field_radius, voxel_size):
+        """
+            (i)     visual_field_radius: Radius of the Sphere;
+            (ii)    voxel_size: how many points in mm.  
+        """
+        ## Debug
+        # Print Points
+        # print(self.FOVcontourPoints)
+
+        # Scatter Plot
+        toplot = []
+
+        u, v = np.mgrid[0:2 * np.pi:50j, 0:np.pi:50j]
+        x = visual_field_radius / voxel_size * np.cos(u) * np.sin(v)
+        y = visual_field_radius / voxel_size * np.sin(u) * np.sin(v)
+        z = visual_field_radius / voxel_size * np.cos(v)
+
+        sphere = go.Surface(x=x, y=y, z=z, opacity=0.7, colorscale=[[0, 'white'], [1, 'white']],
+                            showscale=False)
+        toplot.append(sphere)
+
+        Outline = self.FOVcontourPoints
+        dots = go.Scatter3d(x=Outline[:, 0], y=Outline[:, 1], z=Outline[:, 2],
+                                mode='markers', marker={'color': 'purple', 'size': 2})
+        toplot.append(dots)
+        fig = go.Figure(data=toplot)
+        fig.show()
+
+        # From Cartesian to Spherical
+        spherical_points = []
+        for point in self.FOVcontourPoints:
+            spherical_points.append(self.cartesian2spherical(list(point)))
+
+        n_points = len(spherical_points)
+        spherical_points = np.array(spherical_points)
+
+        # # Plot
+        # _, ax = plt.subplots(2)
+        # ax[0].plot(range(len(spherical_points)), spherical_points[:, 1])
+        # ax[0].grid()
+
+        # ax[0].set_xlabel('N° of Point')
+        # ax[0].set_ylabel('Azimuth [rad]')
+
+        # ax[1].plot(range(len(spherical_points)), spherical_points[:, 2])
+        # ax[1].grid()
+
+        # ax[1].set_xlabel('N° of Point')
+        # ax[1].set_ylabel('Elevation [rad]')
+        # plt.show()
+
+        # Differences of azimuth and elevation. #
+        azimuth_diff = np.zeros((n_points, n_points))
+        elevation_diff = np.zeros((n_points, n_points))
+
+        # Note: The difference of two angles MUST be wrapped to the
+        # range in which the angles are defined, i.e., [-pi, pi].
+        # To do that and avoid misleading (e.g., pi - (-pi) = 2*pi that means 0),
+        # we MUST compute as atan2(sin(alpha2 - alpha1), cos(alpha2 - alpha1)).
+        # The result will be always in the range [-pi, pi]. This procedure is known
+        # in literature as "wrap-to-pi" or "wrap2pi".
+        for i in range(n_points):
+            for j in range(n_points):
+                # Azimuth
+                azimuth_diff[i, j] = spherical_points[i, 1] - spherical_points[j, 1]
+                azimuth_diff[i, j] = np.abs(np.arctan2(np.sin(azimuth_diff[i, j]), np.cos(azimuth_diff[i, j])))
+
+                # Elevation
+                elevation_diff[i, j] = spherical_points[i, 2] - spherical_points[j, 2]
+                elevation_diff[i, j] = np.abs(np.arctan2(np.sin(elevation_diff[i, j]), np.cos(elevation_diff[i, j])))
+                
+        # Plot Differences
+        fig, (ax1, ax2) = plt.subplots(1, 2, subplot_kw={"projection": "3d"})
+        points_idx = range(n_points)
+        X, Y = np.meshgrid(points_idx, points_idx)
+
+        surf0 = ax1.plot_surface(X, Y, azimuth_diff, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+        ax1.set_xlabel("Indexes of points")
+        ax1.set_ylabel("Indexes of points")
+        ax1.set_zlabel("Differences of Azimuth [rad]")
+        ax1.set_title("Differences in Azimuth")
+        ax1.view_init(azim=-103, elev=16)
+
+
+        surf1 = ax2.plot_surface(X, Y, elevation_diff, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+        ax2.set_xlabel("Indexes of points")
+        ax2.set_ylabel("Indexes of points")
+        ax2.set_zlabel("Differences of Elevation [rad]")
+        ax2.set_title("Differences in Elevation")
+        ax2.view_init(azim=-103, elev=16)
+        plt.show()
+
+        # Find Max and min differences
+        max_azimuth = np.max(azimuth_diff)
+        max_elevation = np.max(elevation_diff)
+        print(max_azimuth)
+        print(max_elevation)
+
+  
 class Spider:
     """
     This class creates a spider object. this does the full computation and it is the only one you need to use

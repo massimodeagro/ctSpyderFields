@@ -18,7 +18,7 @@ paramspath = INTERNAL_PATH + '/examples/params.yaml'
 ### IF STARTING FROM PICKLE
 GenusSpecies = ct.Spider(workdir=path, voxelsize=0.003, paramspath=paramspath)
 GenusSpecies.load(filename='Philaeus-chrysops', type='pickle')
-GenusSpecies.spider_SoR = np.linalg.inv(GenusSpecies.head_SoR(plot=False))  # [4, 4] \in SE(3)
+GenusSpecies.spider_SoR = np.linalg.inv(GenusSpecies.head_SoR(plot=True))  # [4, 4] \in SE(3)
 
 GenusSpecies.compute_eyes()
 GenusSpecies.from_std_to_head()

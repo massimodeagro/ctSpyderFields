@@ -641,6 +641,7 @@ class Spider:
         label_names=None,
         voxelsize=0.001,
         available_eyes: list = ["AME", "ALE", "PME", "PLE"],
+        eyes_toplot_colors: dict = {'AME': 'purple', 'ALE': 'darkgreen', 'PME': 'darkgoldenrod', 'PLE': 'maroon'}
     ):
         """
         explain here all self
@@ -703,6 +704,8 @@ class Spider:
         self.cephalothoraxCloud = None
 
         self.spider_SoR = None
+        
+        self.toplot_colors = eyes_toplot_colors
 
     '''
     
@@ -1151,16 +1154,16 @@ class Spider:
             spherical_points[eye], azimuth_points[eye], elevation_points[eye], azimuth_range[eye], elevation_max_spans[eye], elevation_range[eye], azimuth_max_spans[eye] = self.eyes[eye].calculate_span2(angle_resolution, angle_resolution)
 
             # # Azimuth and Elevation single plots
-            # ax1.plot(range(len(azimuth_points[eye])), azimuth_points[eye], linewidth=2, label=eye)
-            # ax2.plot(range(len(elevation_points[eye])), elevation_points[eye], linewidth=2, label=eye)
+            # ax1.plot(range(len(azimuth_points[eye])), azimuth_points[eye], linewidth=2, label=eye, color=self.toplot_colors[eye])
+            # ax2.plot(range(len(elevation_points[eye])), elevation_points[eye], linewidth=2, label=eye, color=self.toplot_colors[eye])
 
             # Azimuth vs Elevation plots
-            ax1.plot(spherical_points[eye][:, 1], spherical_points[eye][:, 2], 'o', label=eye, markersize=3)
-            ax2.plot(spherical_points[eye][:, 2], spherical_points[eye][:, 1], 'o', label=eye, markersize=3)
+            ax1.plot(spherical_points[eye][:, 1], spherical_points[eye][:, 2], 'o', label=eye, markersize=3, color=self.toplot_colors[eye])
+            ax2.plot(spherical_points[eye][:, 2], spherical_points[eye][:, 1], 'o', label=eye, markersize=3, color=self.toplot_colors[eye])
 
             # # Span
-            # ax1.plot(azimuth_range[eye][:angle_resolution-1], elevation_max_spans[eye], linewidth=2, label=eye)
-            # ax2.plot(elevation_range[eye][:angle_resolution-1], azimuth_max_spans[eye], linewidth=2, label=eye)
+            # ax1.plot(azimuth_range[eye][:angle_resolution-1], elevation_max_spans[eye], linewidth=2, label=eye, color=self.toplot_colors[eye])
+            # ax2.plot(elevation_range[eye][:angle_resolution-1], azimuth_max_spans[eye], linewidth=2, label=eye, color=self.toplot_colors[eye])
 
             # Span
             elevation_span[eye] = np.nanmax(elevation_max_spans[eye])
@@ -1169,9 +1172,8 @@ class Spider:
             # Outline
             print("*****************")
             print("Span for the eye:" + eye)
-            print(elevation_span[eye])
             print(azimuth_span[eye])
-            print("*****************")
+            print(elevation_span[eye])
         
         # # Single Plot
         # ax1.grid()
@@ -1218,6 +1220,8 @@ class Spider:
         # ax2.set_xlim(-np.pi/2.0, np.pi/2.0)
         # ax2.legend()
         # plt.show()
+
+        return azimuth_span, elevation_span
             
     def plot_matplotlib(
         self,
@@ -1230,150 +1234,44 @@ class Spider:
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
         ax.set_box_aspect([1, 1, 1])
-        if "AME" in eyes and "AME" in self.available_eyes:
-            if "lens" in elements:
-                lens = self.eyes["AME"].StandardOrientationLensCloud.convex_hull.vertices
-                ax.scatter(lens[:, 0], lens[:, 1], lens[:, 2], color="purple")
-            if "retina" in elements:
-                retina = self.eyes["AME"].StandardOrientationRetinaCloud.convex_hull.vertices
-                ax.scatter(retina[:, 0], retina[:, 1], retina[:, 2], color="purple")
-            if "projection" in elements:
-                Project = np.array(self.eyes["AME"].StandardOrientationProjectedVectors)[:, 2]
-                ax.scatter(
-                    Project[:, 0],
-                    Project[:, 1],
-                    Project[:, 2],
-                    color="indigo",
-                    alpha=alpha,
-                )
-            if "projection_full" in elements:
-                Project = np.array(self.eyes["AME"].StandardOrientationProjectedVectorsFull)[
-                    :, 2
-                ]
-                ax.scatter(
-                    Project[:, 0],
-                    Project[:, 1],
-                    Project[:, 2],
-                    color="indigo",
-                    alpha=alpha,
-                )
-            if "FOVoutline" in elements:
-                Outline = self.eyes["AME"].FOVcontourPoints
-                ax.scatter(
-                    Outline[:, 0],
-                    Outline[:, 1],
-                    Outline[:, 2],
-                    color="indigo",
-                    alpha=alpha,
-                )
-        if "ALE" in eyes and "ALE" in self.available_eyes:
-            if "lens" in elements:
-                lens = self.eyes["ALE"].StandardOrientationLensCloud.convex_hull.vertices
-                ax.scatter(lens[:, 0], lens[:, 1], lens[:, 2], color="green")
-            if "retina" in elements:
-                retina = self.eyes["ALE"].StandardOrientationRetinaCloud.convex_hull.vertices
-                ax.scatter(retina[:, 0], retina[:, 1], retina[:, 2], color="green")
-            if "projection" in elements:
-                Project = np.array(self.eyes["ALE"].StandardOrientationProjectedVectors)[:, 2]
-                ax.scatter(
-                    Project[:, 0],
-                    Project[:, 1],
-                    Project[:, 2],
-                    color="darkgreen",
-                    alpha=alpha,
-                )
-            if "projection_full" in elements:
-                Project = np.array(self.eyes["ALE"].StandardOrientationProjectedVectorsFull)[
-                    :, 2
-                ]
-                ax.scatter(
-                    Project[:, 0],
-                    Project[:, 1],
-                    Project[:, 2],
-                    color="darkgreen",
-                    alpha=alpha,
-                )
-            if "FOVoutline" in elements:
-                Outline = self.eyes["ALE"].FOVcontourPoints
-                ax.scatter(
-                    Outline[:, 0],
-                    Outline[:, 1],
-                    Outline[:, 2],
-                    color="darkgreen",
-                    alpha=alpha,
-                )
-        if "PME" in eyes and "PME" in self.available_eyes:
-            if "lens" in elements:
-                lens = self.eyes["PME"].StandardOrientationLensCloud.convex_hull.vertices
-                ax.scatter(lens[:, 0], lens[:, 1], lens[:, 2], color="goldenrod")
-            if "retina" in elements:
-                retina = self.eyes["PME"].StandardOrientationRetinaCloud.convex_hull.vertices
-                ax.scatter(retina[:, 0], retina[:, 1], retina[:, 2], color="goldenrod")
-            if "projection" in elements:
-                Project = np.array(self.eyes["PME"].StandardOrientationProjectedVectors)[:, 2]
-                ax.scatter(
-                    Project[:, 0],
-                    Project[:, 1],
-                    Project[:, 2],
-                    color="darkgoldenrod",
-                    alpha=alpha,
-                )
-            if "projection_full" in elements:
-                Project = np.array(self.eyes["PME"].StandardOrientationProjectedVectorsFull)[
-                    :, 2
-                ]
-                ax.scatter(
-                    Project[:, 0],
-                    Project[:, 1],
-                    Project[:, 2],
-                    color="darkgoldenrod",
-                    alpha=alpha,
-                )
-            if "FOVoutline" in elements:
-                Outline = self.eyes["PME"].FOVcontourPoints
-                ax.scatter(
-                    Outline[:, 0],
-                    Outline[:, 1],
-                    Outline[:, 2],
-                    color="darkgoldenrod",
-                    alpha=alpha,
-                )
-        if "PLE" in eyes and "PLE" in self.available_eyes:
-            if "lens" in elements:
-                lens = self.eyes["PLE"].StandardOrientationLensCloud.convex_hull.vertices
-                ax.scatter(lens[:, 0], lens[:, 1], lens[:, 2], color="darkred")
-            if "retina" in elements:
-                retina = self.eyes["PLE"].StandardOrientationRetinaCloud.convex_hull.vertices
-                ax.scatter(retina[:, 0], retina[:, 1], retina[:, 2], color="darkred")
-            if "projection" in elements:
-                Project = np.array(self.eyes["PLE"].StandardOrientationProjectedVectors)[:, 2]
-                ax.scatter(
-                    Project[:, 0],
-                    Project[:, 1],
-                    Project[:, 2],
-                    color="maroon",
-                    alpha=alpha,
-                )
-            if "projection_full" in elements:
-                Project = np.array(self.eyes["PLE"].StandardOrientationProjectedVectorsFull)[
-                    :, 2
-                ]
-                ax.scatter(
-                    Project[:, 0],
-                    Project[:, 1],
-                    Project[:, 2],
-                    color="maroon",
-                    alpha=alpha,
-                )
-            if "FOVoutline" in elements:
-                Outline = self.eyes["PLE"].FOVcontourPoints
-                ax.scatter(
-                    Outline[:, 0],
-                    Outline[:, 1],
-                    Outline[:, 2],
-                    color="maroon",
-                    alpha=alpha,
-                )
+        for eye in eyes:
+            if eye in self.available_eyes:
+                if "lens" in elements:
+                    lens = self.eyes[eye].StandardOrientationLensCloud.convex_hull.vertices
+                    ax.scatter(lens[:, 0], lens[:, 1], lens[:, 2], color=self.toplot_colors[eye])
+                if "retina" in elements:
+                    retina = self.eyes[eye].StandardOrientationRetinaCloud.convex_hull.vertices
+                    ax.scatter(retina[:, 0], retina[:, 1], retina[:, 2], color=self.toplot_colors[eye])
+                if "projection" in elements:
+                    Project = np.array(self.eyes[eye].StandardOrientationProjectedVectors)[:, 2]
+                    ax.scatter(
+                        Project[:, 0],
+                        Project[:, 1],
+                        Project[:, 2],
+                        color=self.toplot_colors[eye],
+                        alpha=alpha,
+                    )
+                if "projection_full" in elements:
+                    Project = np.array(self.eyes[eye].StandardOrientationProjectedVectorsFull)[
+                        :, 2
+                    ]
+                    ax.scatter(
+                        Project[:, 0],
+                        Project[:, 1],
+                        Project[:, 2],
+                        color=self.toplot_colors[eye],
+                        alpha=alpha,
+                    )
+                if "FOVoutline" in elements:
+                    Outline = self.eyes[eye].FOVcontourPoints
+                    ax.scatter(
+                        Outline[:, 0],
+                        Outline[:, 1],
+                        Outline[:, 2],
+                        color=self.toplot_colors[eye],
+                        alpha=alpha,
+                    )
+
         if plot_FOV_sphere:
             u, v = np.mgrid[0 : 2 * np.pi : 50j, 0 : np.pi : 50j]
             x = int(field_mm / self.voxelSize) * np.cos(u) * np.sin(v)
@@ -1420,7 +1318,7 @@ class Spider:
                 # Compact Form
                 Outline = self.eyes[eye].FOVcontourPoints
                 dots = go.Scatter3d(x=Outline[:, 0], y=Outline[:, 1], z=Outline[:, 2],
-                                     mode='markers', marker={'color': 'purple', 'size': 2})
+                                     mode='markers', marker={'color': self.toplot_colors[eye], 'size': 2})
                 toplot.append(dots)
         fig = go.Figure(data=toplot)
         fig.show()

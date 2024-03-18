@@ -537,7 +537,7 @@ class Eye:
                 pairwise_diff[i, j] = np.arctan2(np.sin(pairwise_diff[i, j]), np.cos(pairwise_diff[i, j]))
         return pairwise_diff
 
-    def calculate_span2(self, visual_field_radius, voxel_size):
+    def calculate_span2(self, azimuth_resolution = 15, elevation_resolution = 15):
         """
             (i)     visual_field_radius: Radius of the Sphere;
             (ii)    voxel_size: how many points in mm.  
@@ -547,16 +547,13 @@ class Eye:
         for point in self.FOVcontourPoints:
             spherical_points.append(self.cartesian2spherical(list(point)))
 
-        n_points = len(spherical_points)
         spherical_points = np.array(spherical_points)
 
         # Sorting Points in terms of (i) azimuth and (ii) elevation
         azimuth_points = copy.deepcopy(spherical_points[:, 1])
-        # azimuth_idx = np.argsort(azimuth_points)
         azimuth_points.sort()
 
         elevation_points = copy.deepcopy(spherical_points[:, 2])
-        # elevation_idx = np.argsort(elevation_points)
         elevation_points.sort()
 
         # # Azimuth and Elevation single plots
@@ -574,11 +571,8 @@ class Eye:
         # ax2.set_title('Elevation')
         # plt.show()
 
-        # Evaluation of the Span
-        angle_resolution = 15 # 100 Values
-
         # Azimuth range
-        azimuth_range = np.linspace(azimuth_points[0], azimuth_points[-1], angle_resolution)
+        azimuth_range = np.linspace(azimuth_points[0], azimuth_points[-1], azimuth_resolution)
         elevation_max_spans = np.zeros(len(azimuth_range) - 1)
 
         for i in range(len(azimuth_range) - 1):
@@ -592,10 +586,10 @@ class Eye:
             else:
                 elevation_max_spans[i] = np.max(self.pairwise_angle_diff(spherical_points[current_points, 2]))
 
-        elevation_span = np.nanmax(elevation_max_spans)
+        # elevation_span = np.nanmax(elevation_max_spans)
 
         # Elevation range
-        elevation_range = np.linspace(elevation_points[0], elevation_points[-1], angle_resolution)
+        elevation_range = np.linspace(elevation_points[0], elevation_points[-1], elevation_resolution)
         azimuth_max_spans = np.zeros(len(elevation_range) - 1)
 
         for i in range(len(elevation_range) - 1):
@@ -609,29 +603,29 @@ class Eye:
             else:
                 azimuth_max_spans[i] = np.max(self.pairwise_angle_diff(spherical_points[current_points, 1]))
 
-        azimuth_span = np.nanmax(azimuth_max_spans)
+        # azimuth_span = np.nanmax(azimuth_max_spans)
 
-        # Azimuth vs Elevation plots
-        _, (ax1, ax2) = plt.subplots(1, 2)
-        ax1.plot(spherical_points[:, 1], spherical_points[:, 2], 'o')
-        ax1.plot(azimuth_range[:angle_resolution-1], elevation_max_spans, linewidth=2)
-        ax1.grid()
-        ax1.set_xlabel('Azimuth [rad]')
-        ax1.set_ylabel('Elevation [rad]')
-        ax1.set_title("Elevation vs Azimuth")
-        # ax1.set_xlim(-np.pi, np.pi)
+        # # Azimuth vs Elevation plots
+        # _, (ax1, ax2) = plt.subplots(1, 2)
+        # ax1.plot(spherical_points[:, 1], spherical_points[:, 2], 'o')
+        # ax1.plot(azimuth_range[:azimuth_resolution-1], elevation_max_spans, linewidth=2)
+        # ax1.grid()
+        # ax1.set_xlabel('Azimuth [rad]')
+        # ax1.set_ylabel('Elevation [rad]')
+        # ax1.set_title("Elevation vs Azimuth")
+        # # ax1.set_xlim(-np.pi, np.pi)
 
-        ax2.plot(spherical_points[:, 2], spherical_points[:, 1], 'o')
-        ax2.plot(elevation_range[:angle_resolution-1], azimuth_max_spans, linewidth=2)
-        ax2.grid()
-        ax2.set_xlabel('Elevation [rad]')
-        ax2.set_ylabel('Azimuth [rad]')
-        ax2.set_title("Azimuth vs Elevation")
-        # ax2.set_xlim(-np.pi/2.0, np.pi/2.0)
-        plt.show()
-                
+        # ax2.plot(spherical_points[:, 2], spherical_points[:, 1], 'o')
+        # ax2.plot(elevation_range[:elevation_resolution-1], azimuth_max_spans, linewidth=2)
+        # ax2.grid()
+        # ax2.set_xlabel('Elevation [rad]')
+        # ax2.set_ylabel('Azimuth [rad]')
+        # ax2.set_title("Azimuth vs Elevation")
+        # # ax2.set_xlim(-np.pi/2.0, np.pi/2.0)
+        # plt.show()
 
-            
+        # Return
+        return spherical_points, azimuth_points, elevation_points, azimuth_range, elevation_max_spans, elevation_range, azimuth_max_spans   
 
   
 class Spider:
@@ -947,38 +941,6 @@ class Spider:
             ax.set_ylabel('Y [pixel]')
             ax.set_zlabel('Z [n° layer]')
         
-        # # Proposal 1: PCA
-        # # Advantages: the best method to have a reference system with minimal differences
-        # # between the axes and the experimental points
-        # # Principal Component Analysis
-        # mean = np.mean(point_dataset, axis=0)
-        # centered_dataset = point_dataset - mean
-        # cov_matrix = np.cov(centered_dataset, rowvar=False)
-        # pca = PCA()
-        # pca.fit(cov_matrix)
-        
-        # # Find the index of the axis with the smallest absolute eigenvalue
-        # min_abs_eigenvalue_index = np.argmin(np.abs(np.linalg.eigvals(pca.components_)))
-        # # Flip the sign of the corresponding axis
-        # pca.components_[:, min_abs_eigenvalue_index] *= -1
-        
-        # # Compute the dot product between each principal axis and the back-front direction
-        # dot_products = np.abs(np.dot(pca.components_, x_hand))
-
-        # # Sort the principal axes based on the absolute dot product values
-        # sorted_indices = np.argsort(dot_products)[::-1]
-
-        # # Reassign the axes accordingly
-        # sorted_axes = pca.components_[sorted_indices]
-        
-        # # Plot the principal axes
-        # origin = mean
-        # ax.scatter(mean[0], mean[1], mean[2])
-        # ax.text(mean[0], mean[1], mean[2], 'mean')
-        
-        # for axis in sorted_axes.T:
-        #     ax.quiver(*origin, *axis, length=500)
-        
         # # Proposal 2: Pure geometrical method
         # Axis 1: back -> front
         x_axis = x_hand
@@ -1167,6 +1129,96 @@ class Spider:
                                                        voxel_size=self.voxelSize)
         return spans
 
+    def spherical_points(self, eyes=("AME", "ALE", "PME", "PLE")):
+        # Init Dictionaries
+        spherical_points = dict.fromkeys(eyes, None)
+        azimuth_points = dict.fromkeys(eyes, None)
+        elevation_points = dict.fromkeys(eyes, None)
+        azimuth_range = dict.fromkeys(eyes, None)
+        elevation_max_spans = dict.fromkeys(eyes, None)
+        elevation_range = dict.fromkeys(eyes, None)
+        azimuth_max_spans = dict.fromkeys(eyes, None)
+        elevation_span = dict.fromkeys(eyes, None)
+        azimuth_span = dict.fromkeys(eyes, None)
+
+        angle_resolution = 15
+
+        # Init Figure
+        _, (ax1, ax2) = plt.subplots(1, 2)
+
+        # Extract Informations
+        for eye in eyes:
+            spherical_points[eye], azimuth_points[eye], elevation_points[eye], azimuth_range[eye], elevation_max_spans[eye], elevation_range[eye], azimuth_max_spans[eye] = self.eyes[eye].calculate_span2(angle_resolution, angle_resolution)
+
+            # # Azimuth and Elevation single plots
+            # ax1.plot(range(len(azimuth_points[eye])), azimuth_points[eye], linewidth=2, label=eye)
+            # ax2.plot(range(len(elevation_points[eye])), elevation_points[eye], linewidth=2, label=eye)
+
+            # Azimuth vs Elevation plots
+            ax1.plot(spherical_points[eye][:, 1], spherical_points[eye][:, 2], 'o', label=eye, markersize=3)
+            ax2.plot(spherical_points[eye][:, 2], spherical_points[eye][:, 1], 'o', label=eye, markersize=3)
+
+            # # Span
+            # ax1.plot(azimuth_range[eye][:angle_resolution-1], elevation_max_spans[eye], linewidth=2, label=eye)
+            # ax2.plot(elevation_range[eye][:angle_resolution-1], azimuth_max_spans[eye], linewidth=2, label=eye)
+
+            # Span
+            elevation_span[eye] = np.nanmax(elevation_max_spans[eye])
+            azimuth_span[eye] = np.nanmax(azimuth_max_spans[eye])
+
+            # Outline
+            print("*****************")
+            print("Span for the eye:" + eye)
+            print(elevation_span[eye])
+            print(azimuth_span[eye])
+            print("*****************")
+        
+        # # Single Plot
+        # ax1.grid()
+        # ax1.set_xlabel('N° of Points (sorted in terms of azimuth)')
+        # ax1.set_ylabel('Azimuth [rad]')
+        # ax1.set_title('Azimuth')
+        # ax1.legend()
+
+        # ax2.grid()  
+        # ax2.set_xlabel('N° of Points (sorted in terms of elevation)')
+        # ax2.set_ylabel('Elevation [rad]')
+        # ax2.set_title('Elevation')
+        # ax2.legend()
+        # plt.show()
+        
+        # Azimuth vs Elevation plots
+        ax1.grid()
+        ax1.set_xlabel('Azimuth [rad]')
+        ax1.set_ylabel('Elevation [rad]')
+        ax1.set_title("Elevation vs Azimuth")
+        ax1.set_xlim(-np.pi, np.pi)
+        ax1.legend()
+
+        ax2.grid()
+        ax2.set_xlabel('Elevation [rad]')
+        ax2.set_ylabel('Azimuth [rad]')
+        ax2.set_title("Azimuth vs Elevation")
+        ax2.set_xlim(-np.pi/2.0, np.pi/2.0)
+        ax2.legend()
+        plt.show()
+            
+        # # Span
+        # ax1.grid()
+        # ax1.set_xlabel('Azimuth [rad]')
+        # ax1.set_ylabel('Elevation [rad]')
+        # ax1.set_title("Span in Elevation")
+        # ax1.set_xlim(-np.pi, np.pi)
+        # ax1.legend()
+
+        # ax2.grid()
+        # ax2.set_xlabel('Elevation [rad]')
+        # ax2.set_ylabel('Azimuth [rad]')
+        # ax2.set_title("Span in Azimuth")
+        # ax2.set_xlim(-np.pi/2.0, np.pi/2.0)
+        # ax2.legend()
+        # plt.show()
+            
     def plot_matplotlib(
         self,
         eyes=("AME", "ALE", "PME", "PLE"),
@@ -1328,7 +1380,19 @@ class Spider:
             y = int(field_mm / self.voxelSize) * np.sin(u) * np.sin(v)
             z = int(field_mm / self.voxelSize) * np.cos(v)
 
-            ax.plot_wireframe(x, y, z, linewidth=0.50, color="black")
+            ax.plot_wireframe(x, y, z, linewidth=0.50, color="darkgrey")
+
+        # Compose SO(3) group
+        R = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+        # Origin as the center marker
+        origin = [0, 0, 0]
+        
+        # Visualizing
+        for axis in R:
+            ax.quiver(*origin, *axis, length=20000)
+        ax.text(20000, 0, 0, "x")
+        ax.text(0, 20000, 0, "y")
+        ax.text(0, 0, 20000, "z")
 
         plt.show()
 
@@ -1360,22 +1424,3 @@ class Spider:
                 toplot.append(dots)
         fig = go.Figure(data=toplot)
         fig.show()
-
-    # # Homogeneous Matrix for planar roto-translation (SE(2) group)
-    # def se2_from_two_points(self, p1, p2):
-    #     # Compute Distance versor
-    #     distance = p2 - p1
-    #     j_versor = distance/np.linalg.norm(distance)
-
-    #     # Find the orthogonal
-    #     if j_versor[0] == 0:
-    #         i_versor = np.array([1, 0])
-    #     else:
-    #         i_versor = np.array([1, -j_versor[1]/j_versor[0]])
-    #         i_versor /= np.linalg.norm(i_versor)
-
-    #     # Compose the SE(2) matrix
-    #     rot_matrix2d = np.array([i_versor, j_versor]).T
-    #     T2d = np.concatenate((rot_matrix2d, np.array([p1]).T), axis=1)
-    #     T2d = np.concatenate((T2d, np.array([[0, 0, 1]])), axis=0)
-    #     return T2d

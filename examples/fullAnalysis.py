@@ -32,7 +32,7 @@ GenusSpecies.compute_eyes()
 GenusSpecies.from_std_to_head()
 GenusSpecies.project_retinas_full(field_mm=150)
 GenusSpecies.find_all_fields_contours(stepsizes=[500, 1000, 1000, 1000], tolerances=[500,5000,5000,5000])
-GenusSpecies.eyes['ALE'].calculate_span2(150, 0.003)
+GenusSpecies.eyes['AME'].calculate_span2(150, 0.003)
 # spans = GenusSpecies.calculate_eyes_spans(field_radius=150)
 
 # GenusSpecies.plot_pyplot(elements=("FOVoutline"))

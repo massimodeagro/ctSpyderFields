@@ -1157,15 +1157,15 @@ class Spider:
             # ax1.plot(range(len(azimuth_points[eye])), azimuth_points[eye], linewidth=2, label=eye, color=self.toplot_colors[eye])
             # ax2.plot(range(len(elevation_points[eye])), elevation_points[eye], linewidth=2, label=eye, color=self.toplot_colors[eye])
 
-            # Azimuth vs Elevation plots
-            ax1.plot(spherical_points[eye][:, 1], spherical_points[eye][:, 2], 'o', label=eye, markersize=3, color=self.toplot_colors[eye])
-            ax2.plot(spherical_points[eye][:, 2], spherical_points[eye][:, 1], 'o', label=eye, markersize=3, color=self.toplot_colors[eye])
-
-            # # Span
-            # ax1.plot(azimuth_range[eye][:angle_resolution-1], elevation_max_spans[eye], linewidth=2, label=eye, color=self.toplot_colors[eye])
-            # ax2.plot(elevation_range[eye][:angle_resolution-1], azimuth_max_spans[eye], linewidth=2, label=eye, color=self.toplot_colors[eye])
+            # # Azimuth vs Elevation plots
+            # ax1.plot(spherical_points[eye][:, 1], spherical_points[eye][:, 2], 'o', label=eye, markersize=3, color=self.toplot_colors[eye])
+            # ax2.plot(spherical_points[eye][:, 2], spherical_points[eye][:, 1], 'o', label=eye, markersize=3, color=self.toplot_colors[eye])
 
             # Span
+            ax1.plot(azimuth_range[eye][:angle_resolution-1], elevation_max_spans[eye], '--', linewidth=2, label='Span of' + eye, color=self.toplot_colors[eye])
+            ax2.plot(elevation_range[eye][:angle_resolution-1], azimuth_max_spans[eye], '--', linewidth=2, label='Span of' + eye, color=self.toplot_colors[eye])
+
+            # Max Span
             elevation_span[eye] = np.nanmax(elevation_max_spans[eye])
             azimuth_span[eye] = np.nanmax(azimuth_max_spans[eye])
 
@@ -1189,37 +1189,37 @@ class Spider:
         # ax2.legend()
         # plt.show()
         
-        # Azimuth vs Elevation plots
-        ax1.grid()
-        ax1.set_xlabel('Azimuth [rad]')
-        ax1.set_ylabel('Elevation [rad]')
-        ax1.set_title("Elevation vs Azimuth")
-        ax1.set_xlim(-np.pi, np.pi)
-        ax1.legend()
-
-        ax2.grid()
-        ax2.set_xlabel('Elevation [rad]')
-        ax2.set_ylabel('Azimuth [rad]')
-        ax2.set_title("Azimuth vs Elevation")
-        ax2.set_xlim(-np.pi/2.0, np.pi/2.0)
-        ax2.legend()
-        plt.show()
-            
-        # # Span
+        # # Azimuth vs Elevation plots
         # ax1.grid()
         # ax1.set_xlabel('Azimuth [rad]')
         # ax1.set_ylabel('Elevation [rad]')
-        # ax1.set_title("Span in Elevation")
+        # ax1.set_title("Elevation vs Azimuth")
         # ax1.set_xlim(-np.pi, np.pi)
         # ax1.legend()
 
         # ax2.grid()
         # ax2.set_xlabel('Elevation [rad]')
         # ax2.set_ylabel('Azimuth [rad]')
-        # ax2.set_title("Span in Azimuth")
+        # ax2.set_title("Azimuth vs Elevation")
         # ax2.set_xlim(-np.pi/2.0, np.pi/2.0)
         # ax2.legend()
         # plt.show()
+            
+        # Span
+        ax1.grid()
+        ax1.set_xlabel('Azimuth [rad]')
+        ax1.set_ylabel('Elevation [rad]')
+        ax1.set_title("Span in Elevation")
+        ax1.set_xlim(-np.pi, np.pi)
+        ax1.legend()
+
+        ax2.grid()
+        ax2.set_xlabel('Elevation [rad]')
+        ax2.set_ylabel('Azimuth [rad]')
+        ax2.set_title("Span in Azimuth")
+        ax2.set_xlim(-np.pi/2.0, np.pi/2.0)
+        ax2.legend()
+        plt.show()
 
         return azimuth_span, elevation_span
             

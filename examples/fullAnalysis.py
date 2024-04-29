@@ -25,7 +25,8 @@ GenusSpecies.find_all_fields_contours(stepsizes=[500, 1000, 1000, 1000], toleran
 GenusSpecies.sphericalCoordinates_compute()
 GenusSpecies.sphericalCoordinates_plotSorted()
 GenusSpecies.sphericalCoordinates_plotFields()
-GenusSpecies.sphericalCoordinates_plotSpans()
+GenusSpecies.sphericalCoordinates_plotSpans(disc='general')
+GenusSpecies.sphericalCoordinates_plotSpans(disc='specific')
 
 
 # GenusSpecies.plot_pyplot(elements=("FOVoutline"))

@@ -540,7 +540,7 @@ class Eye:
                                        angles[i], angles[j]])
         return np.array(pairwise_diff)
 
-    def calculate_span2(self, azimuth_resolution=15, elevation_resolution=15):
+    def calculate_span2(self, specific_discretization=15, general_discretization=72):
         """
             (i)     visual_field_radius: Radius of the Sphere;
             (ii)    voxel_size: how many points in mm.  
@@ -559,46 +559,99 @@ class Eye:
         elevation_points = copy.deepcopy(spherical_points[:, 2])
         elevation_points.sort()
 
+        ### SPECIFIC DISCRETIZATION ###
+
         # Azimuth range
-        azimuth_range = np.linspace(azimuth_points[0], azimuth_points[-1], azimuth_resolution)
+        azimuth_range = np.linspace(azimuth_points[0], azimuth_points[-1], specific_discretization)
         azimuth_ranges = [azimuth_range[:-1],azimuth_range[1:]]
-        elevation_max_spans = []
+        elevation_max_spans = {'azimuth_range': [], 'span': [], 'extremes': []}
 
         for r in np.array(azimuth_ranges).T:
             # Points in the current range
             current_points = np.argwhere((spherical_points[:, 1] < r[1]) & (spherical_points[:, 1] >= r[0])).flatten()
 
+            elevation_max_spans['azimuth_range'].append(r)
+
             if len(current_points) < 2:
-                elevation_max_spans.append([np.nan, np.nan, np.nan])
-                continue
+                elevation_max_spans['span'].append(np.nan)
+                elevation_max_spans['extremes'].append(np.nan, np.nan)
 
             else:
                 spans = self.pairwise_angle_diff(spherical_points[current_points, 2])
-                elevation_max_spans.append(spans[np.argmax(spans[:,0])])
+                this_spans = spans[np.argmax(spans[:,0])]
+                elevation_max_spans['span'].append(this_spans[0])
+                elevation_max_spans['extremes'].append(this_spans[1:])
 
         # Elevation range
-        elevation_range = np.linspace(elevation_points[0], elevation_points[-1], elevation_resolution)
+        elevation_range = np.linspace(elevation_points[0], elevation_points[-1], specific_discretization)
         elevation_ranges = [elevation_range[:-1], elevation_range[1:]]
-        azimuth_max_spans = []
+        azimuth_max_spans = {'elevation_range': [], 'span': [], 'extremes': []}
 
         for r in np.array(elevation_ranges).T:
             # Points in the current range
             current_points = np.argwhere((spherical_points[:, 2] < r[1]) & (spherical_points[:, 2] >= r[0])).flatten()
 
+            azimuth_max_spans['elevation_range'].append(r)
             if len(current_points) < 2:
-                azimuth_max_spans.append([np.nan, np.nan, np.nan])
-                continue
+                azimuth_max_spans['span'].append(np.nan)
+                azimuth_max_spans['extremes'].append([np.nan, np.nan])
+
             else:
-                spans = self.pairwise_angle_diff(spherical_points[current_points, 2])
-                azimuth_max_spans.append(spans[np.argmax(spans[:, 0])])
+                spans = self.pairwise_angle_diff(spherical_points[current_points, 1])
+                this_spans = spans[np.argmax(spans[:, 0])]
+                azimuth_max_spans['span'].append(this_spans[0])
+                azimuth_max_spans['extremes'].append(this_spans[1:])
 
         self.spherical_coordinates['spherical_points'] = {'azimuth': spherical_points[:,1], 'elevation': spherical_points[:,2]}
-        self.spherical_coordinates['azimuth_ranges'] = azimuth_ranges
-        self.spherical_coordinates['elevation_ranges'] = elevation_ranges
-        self.spherical_coordinates['azimuth_max_spans'] = azimuth_max_spans
-        self.spherical_coordinates['elevation_max_spans'] = elevation_max_spans
-        self.spherical_coordinates['azimuth_resolution'] = azimuth_resolution
-        self.spherical_coordinates['elevation_resolution'] = elevation_resolution
+        self.spherical_coordinates['azimuth_max_spans'] = {}
+        self.spherical_coordinates['elevation_max_spans'] = {}
+        self.spherical_coordinates['azimuth_max_spans']['specific_discretization'] = azimuth_max_spans
+        self.spherical_coordinates['elevation_max_spans']['specific_discretization'] = elevation_max_spans
+
+        ### General DISCRETIZATION ###
+
+        # Azimuth range
+        azimuth_range = np.linspace(np.deg2rad(-180), np.deg2rad(180), general_discretization)
+        azimuth_ranges = [azimuth_range[:-1], azimuth_range[1:]]
+        elevation_max_spans = {'azimuth_range': [], 'span': [], 'extremes': []}
+
+        for r in np.array(azimuth_ranges).T:
+            # Points in the current range
+            current_points = np.argwhere((spherical_points[:, 1] < r[1]) & (spherical_points[:, 1] >= r[0])).flatten()
+
+            elevation_max_spans['azimuth_range'].append(r)
+            if len(current_points) < 2:
+                elevation_max_spans['span'].append(np.nan)
+                elevation_max_spans['extremes'].append([np.nan, np.nan])
+
+            else:
+                spans = self.pairwise_angle_diff(spherical_points[current_points, 2])
+                this_spans = spans[np.argmax(spans[:, 0])]
+                elevation_max_spans['span'].append(this_spans[0])
+                elevation_max_spans['extremes'].append(this_spans[1:])
+
+        # Elevation range
+        elevation_range = np.linspace(np.deg2rad(-180), np.deg2rad(180), general_discretization)
+        elevation_ranges = [elevation_range[:-1], elevation_range[1:]]
+        azimuth_max_spans = {'elevation_range': [], 'span': [], 'extremes': []}
+
+        for r in np.array(elevation_ranges).T:
+            # Points in the current range
+            current_points = np.argwhere((spherical_points[:, 2] < r[1]) & (spherical_points[:, 2] >= r[0])).flatten()
+
+            azimuth_max_spans['elevation_range'].append(r)
+            if len(current_points) < 2:
+                azimuth_max_spans['span'].append(np.nan)
+                azimuth_max_spans['extremes'].append([np.nan, np.nan])
+
+            else:
+                spans = self.pairwise_angle_diff(spherical_points[current_points, 1])
+                this_spans = spans[np.argmax(spans[:, 0])]
+                azimuth_max_spans['span'].append(this_spans[0])
+                azimuth_max_spans['extremes'].append(this_spans[1:])
+
+        self.spherical_coordinates['azimuth_max_spans']['general_discretization'] = azimuth_max_spans
+        self.spherical_coordinates['elevation_max_spans']['general_discretization'] = elevation_max_spans
 
   
 class Spider:
@@ -1106,11 +1159,12 @@ class Spider:
                                                        voxel_size=self.voxelSize)
         return spans
 
-    def sphericalCoordinates_compute(self, eyes=("AME", "ALE", "PME", "PLE"), azimuth_resolution=15, elevation_resolution=15):
+    #TODO I am not sure this works still. Ask Daniele
+    def sphericalCoordinates_compute(self, eyes=("AME", "ALE", "PME", "PLE"), specific_discretization=15, general_discretization=72):
 
-        # Extract Informations
+        # Extract Information
         for eye in eyes:
-            self.eyes[eye].calculate_span2(azimuth_resolution, elevation_resolution)
+            self.eyes[eye].calculate_span2(specific_discretization, general_discretization)
 
     def sphericalCoordinates_save(self, eyes=("AME", "ALE", "PME", "PLE"), raw=False, span=False, overlap=False):
         pass
@@ -1119,11 +1173,11 @@ class Spider:
         fig, axs = plt.subplots(1,2)
         for eye in eyes:
             # # Azimuth and Elevation single plots
-            axs[0].plot(range(len(self.eyes[eye].spherical_coordinates['azimuth_points'])),
-                       self.eyes[eye].spherical_coordinates['azimuth_points'],
+            axs[0].plot(range(len(self.eyes[eye].spherical_coordinates['spherical_points']['azimuth'])),
+                       np.sort(self.eyes[eye].spherical_coordinates['spherical_points']['azimuth']),
                         linewidth=2, label=eye, color=self.toplot_colors[eye])
-            axs[1].plot(range(len(self.eyes[eye].spherical_coordinates['elevation_points'])),
-                        self.eyes[eye].spherical_coordinates['elevation_points'],
+            axs[1].plot(range(len(self.eyes[eye].spherical_coordinates['spherical_points']['elevation'])),
+                        np.sort(self.eyes[eye].spherical_coordinates['spherical_points']['elevation']),
                         linewidth=2, label=eye, color=self.toplot_colors[eye])
         # # Single Plot
         axs[0].grid()
@@ -1154,15 +1208,25 @@ class Spider:
         ax.legend()
         fig.show()
 
-    def sphericalCoordinates_plotSpans(self, eyes=("AME", "ALE", "PME", "PLE"), ret=False):
+    def sphericalCoordinates_plotSpans(self, eyes=("AME", "ALE", "PME", "PLE"), disc='general', ret=False):
         fig, axs = plt.subplots(1,2)
         for eye in eyes:
+            if disc=='general':
+                az = self.eyes[eye].spherical_coordinates['azimuth_max_spans']['general_discretization']
+                el = self.eyes[eye].spherical_coordinates['elevation_max_spans']['general_discretization']
+            if disc=='specific':
+                az = self.eyes[eye].spherical_coordinates['azimuth_max_spans']['specific_discretization']
+                el = self.eyes[eye].spherical_coordinates['elevation_max_spans']['specific_discretization']
+
+            aznames = [a[0] for a in az['elevation_range']]
+            elnames = [e[0] for e in el['azimuth_range']]
+
             # Span
-            axs[0].plot(self.eyes[eye].spherical_coordinates['azimuth_range'][:self.eyes[eye].spherical_coordinates['azimuth_resolution']-1],
-                        self.eyes[eye].spherical_coordinates['elevation_max_spans'],
+            axs[0].plot(aznames,
+                        az['span'],
                         '--', linewidth=2, label='Span of' + eye, color=self.toplot_colors[eye])
-            axs[1].plot(self.eyes[eye].spherical_coordinates['elevation_range'][:self.eyes[eye].spherical_coordinates['elevation_resolution']-1],
-                        self.eyes[eye].spherical_coordinates['azimuth_max_spans'],
+            axs[1].plot(elnames,
+                        el['span'],
                         '--', linewidth=2, label='Span of' + eye, color=self.toplot_colors[eye])
         # Span
         axs[0].grid()

@@ -1214,33 +1214,38 @@ class Spider:
             if disc=='general':
                 az = self.eyes[eye].spherical_coordinates['azimuth_max_spans']['general_discretization']
                 el = self.eyes[eye].spherical_coordinates['elevation_max_spans']['general_discretization']
-            if disc=='specific':
+            elif disc=='specific':
                 az = self.eyes[eye].spherical_coordinates['azimuth_max_spans']['specific_discretization']
                 el = self.eyes[eye].spherical_coordinates['elevation_max_spans']['specific_discretization']
+            else:
+                raise ValueError("undefined disdcretization. please check")
 
-            aznames = [a[0] for a in az['elevation_range']]
-            elnames = [e[0] for e in el['azimuth_range']]
+            aznames = np.rad2deg(np.array(az['elevation_range']).flatten())
+            azvals = np.rad2deg(np.repeat(az['span'], 2))
+            elnames = np.rad2deg(np.array(el['azimuth_range']).flatten())
+            elvals = np.rad2deg(np.repeat(el['span'], 2))
 
             # Span
-            axs[0].plot(aznames,
-                        az['span'],
-                        '--', linewidth=2, label='Span of' + eye, color=self.toplot_colors[eye])
-            axs[1].plot(elnames,
-                        el['span'],
-                        '--', linewidth=2, label='Span of' + eye, color=self.toplot_colors[eye])
+            axs[1].plot(azvals,
+                        aznames, label='Span of ' + eye, color=self.toplot_colors[eye])
+            axs[0].plot(elnames,
+                        elvals, label='Span of ' + eye, color=self.toplot_colors[eye])
+
         # Span
         axs[0].grid()
-        axs[0].set_xlabel('Azimuth [rad]')
-        axs[0].set_ylabel('Elevation [rad]')
-        axs[0].set_title("Span in Elevation")
-        axs[0].set_xlim(-np.pi, np.pi)
+        axs[0].set_xlabel('Azimuth Range')
+        axs[0].set_ylabel('Elevation')
+        axs[0].set_title("FOV elevation span per azimuth window")
+        axs[0].set_xlim(-180, 180)
+        axs[0].set_ylim(0, 180)
         axs[0].legend()
 
         axs[1].grid()
-        axs[1].set_xlabel('Elevation [rad]')
-        axs[1].set_ylabel('Azimuth [rad]')
-        axs[1].set_title("Span in Azimuth")
-        axs[1].set_xlim(-np.pi/2.0, np.pi/2.0)
+        axs[1].set_xlabel('Azimuth')
+        axs[1].set_ylabel('Elevation Range')
+        axs[1].set_title("FOV azimuth span per elevation window")
+        axs[1].set_xlim(0, 180)
+        axs[1].set_ylim(-180, 180)
         axs[1].legend()
         fig.show()
 

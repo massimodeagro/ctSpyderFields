@@ -179,7 +179,7 @@ class Eye:
         self.RotatedRetinaCloud = trimesh.points.PointCloud(self.RotatedRetinaPoints)
         ### The points expressed in SoR {Camera} are expressed now in the {Lens} SoR
 
-    def find_split_plane(self):
+    def find_split_plane(self): #TODO porcata di massimo
         """
         this function finds the plane (xy, xz, yz) that divides retina from lens,
         as well as on which side of the two is the retina and on which is the lens.
@@ -289,6 +289,7 @@ class Eye:
         """
         self.find_split_plane()
         self.RotatedLensSphere = self.sphere_fit(self.RotatedLensSurfacePoints)
+        #TODO catch if sphere fit found a center with value < min retina
 
     def rotate_back(self):
         """
@@ -513,6 +514,8 @@ class Eye:
             sagittalArgSpan = [np.argmin(sagittalAnglesOnPlane), np.argmax(sagittalAnglesOnPlane)]
         else:
             sagittalSpan = [None, None]
+
+        #TODO add angle span from max e min to all three planes @Daniele
 
         return {'Transverse': transverseSpan, 'Coronal': coronalSpan, 'Sagittal': sagittalSpan}
     

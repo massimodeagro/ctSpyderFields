@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 import ctSpyderFields.ctSpyderFields as ct
 import numpy as np
 
-path =  '/mnt/Archive_NTFS/Drive/Experiments/Spider_ctSpyderFields/Data/PhilaeusChrysops/'
-paramspath = '/home/massimodeagro/PycharmProjects/ctSpyderFields/examples/params.yaml'
+path =  '/home/massimodeagro/CTspyderFields/ctSpyderFields/Data/PhilaeusChrysops/'
+paramspath = '/home/massimodeagro/CTspyderFields/ctSpyderFields/examples/params.yaml'
 
 ### IF STARTING FROM PICKLE
 GenusSpecies = ct.Spider(workdir=path, voxelsize=0.003, paramspath=paramspath)
@@ -27,7 +27,12 @@ GenusSpecies.sphericalCoordinates_plotSorted()
 GenusSpecies.sphericalCoordinates_plotFields()
 GenusSpecies.sphericalCoordinates_plotSpans(disc='general')
 GenusSpecies.sphericalCoordinates_plotSpans(disc='specific')
+#CALCULATE PROPORTIONS OF VISUAL FIELDS
 
+#PHILAEUS
+#PIRATA
+#CORIARACHNE
 
 # GenusSpecies.plot_pyplot(elements=("FOVoutline"))
 #GenusSpecies.plot_matplotlib(elements=("FOVoutline"))
+GenusSpecies.plot_matplotlib(elements=("lens", "retina"), plot_FOV_sphere=False)

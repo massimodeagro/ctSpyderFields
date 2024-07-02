@@ -654,6 +654,7 @@ class Eye:
 
         self.spherical_coordinates['azimuth_max_spans']['general_discretization'] = azimuth_max_spans
         self.spherical_coordinates['elevation_max_spans']['general_discretization'] = elevation_max_spans
+    
     def compute_arbitraryOverlap(self, comparator_identity, other_eye_data):
         self.spherical_coordinates['overlaps'][comparator_identity] = {}
         self.spherical_coordinates['overlaps'][comparator_identity]['azimuth'] = \
@@ -885,6 +886,7 @@ class Spider:
                 self.SeparateLabelPictures[group][object].append(cv2.imread(self.path + file, 0))
             elif style == 'color':
                 self.SeparateLabelPictures[group][object].append(cv2.imread(self.path + file, 1))
+    
     def load_all_labels_split(self,  style='binary'):
         """
         This function calls dragonfly_load_label for 4 + 7 times
@@ -1319,6 +1321,7 @@ class Spider:
 
 
         pass
+
     def sphericalCoordinates_plotSorted(self, eyes=("AME", "ALE", "PME", "PLE")):
 
         fig, axs = plt.subplots(1,2)
@@ -1343,6 +1346,7 @@ class Spider:
         axs[1].set_title('Elevation')
         axs[1].legend()
         fig.show()
+        
     def sphericalCoordinates_plotFields(self, eyes=("AME", "ALE", "PME", "PLE"), ret=False):
         fig, ax = plt.subplots()
         for eye in eyes:

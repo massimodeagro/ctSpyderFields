@@ -20,7 +20,7 @@ GenusSpecies.find_all_fields_contours(stepsizes=[500, 1000, 300, 1000], toleranc
 GenusSpecies.sphericalCoordinates_compute(specific_discretization=15, general_discretization=36)
 GenusSpecies.binocularOverlap_compute()
 GenusSpecies.multiEyeOverlap_compute()
-# GenusSpecies.sphericalCoordinates_plotSorted()
+GenusSpecies.sphericalCoordinates_plotSorted()
 GenusSpecies.sphericalCoordinates_plotFields()
 GenusSpecies.sphericalCoordinates_plotSpans(disc='general')
 GenusSpecies.sphericalCoordinates_plotSpans(disc='specific')

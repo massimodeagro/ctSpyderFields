@@ -776,6 +776,8 @@ class Eye:
         for ran, extremes in zip(elevation_range, azimuth_span):
             self.spherical_coordinates['overlaps']['binocular']['azimuth'][disc+'_discretization']['elevation_range'].append(ran)
             flip_extremes = extremes*-1
+            if len(flip_extremes) == 0:
+                flip_extremes = [np.nan, np.nan]
             extremes = sorted(extremes)
             flip_extremes = sorted(flip_extremes)
 
@@ -804,6 +806,8 @@ class Eye:
             self.spherical_coordinates['overlaps']['binocular']['elevation'][disc+'_discretization'][
                 'azimuth_range'].append(ran)
             flip_extremes = extremes * -1
+            if len(flip_extremes) == 0:
+                flip_extremes = [np.nan, np.nan]
             extremes = sorted(extremes)
             flip_extremes = sorted(flip_extremes)
 

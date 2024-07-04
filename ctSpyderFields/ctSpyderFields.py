@@ -225,23 +225,30 @@ class Eye:
             if overlapX < overlapY and overlapX < overlapZ:
                 if LensSpanX[0] > RetinaSpanX[0]:
                     mask = self.RotatedLensCloud.convex_hull.vertices[:, 0] > 0
+                    split_plane = 'x+'
                 else:
                     mask = self.RotatedLensCloud.convex_hull.vertices[:, 0] < 0
+                    split_plane = 'x-'
             elif overlapY < overlapX and overlapY < overlapZ:
                 if LensSpanY[0] > RetinaSpanY[0]:
                     mask = self.RotatedLensCloud.convex_hull.vertices[:, 1] > 0
+                    split_plane = 'y+'
                 else:
                     mask = self.RotatedLensCloud.convex_hull.vertices[:, 1] < 0
+                    split_plane = 'y-'
             elif overlapZ < overlapX and overlapZ < overlapY:
                 if LensSpanZ[0] > RetinaSpanZ[0]:
                     mask = self.RotatedLensCloud.convex_hull.vertices[:, 2] > 0
+                    split_plane = 'z+'
                 else:
                     mask = self.RotatedLensCloud.convex_hull.vertices[:, 2] < 0
-            
+                    split_plane = 'z-'
+
             self.RotatedLensSurfacePoints = self.RotatedLensCloud.convex_hull.vertices[mask, :]
         else:
             print("cry")  # TODO: do a better error catching process
             pass
+        return split_plane, [LensSpanX, LensSpanY, LensSpanZ], [RetinaSpanX, RetinaSpanY, RetinaSpanZ]
 
     def sphere_fit(self, point_cloud):
         """
@@ -285,12 +292,54 @@ class Eye:
 
         return (radius, sphere_center)
 
-    def find_lens_sphere(self):
+    def find_lens_sphere(self, focal_point_type, focal_point_position):
         """
         helper function, call the two previous formulas to do everything in one step
         """
-        self.find_split_plane()
-        self.RotatedLensSphere = self.sphere_fit(self.RotatedLensSurfacePoints)
+        split_plane, lens_spans, retinas_spans = self.find_split_plane()
+        if focal_point_type == 'sphere':
+            self.RotatedLensSphere = self.sphere_fit(self.RotatedLensSurfacePoints)
+        else:
+            if split_plane == 'x+':
+                lens_top, retina_bottom = max(lens_spans[0]), min(retinas_spans[0])
+                focal_x = retina_bottom + focal_point_position * (lens_top - retina_bottom)
+                focal_y = np.mean(lens_spans[1])
+                focal_z = np.mean(lens_spans[2])
+
+            elif split_plane == 'x-':
+                lens_top, retina_bottom = min(lens_spans[0]), max(retinas_spans[0])
+                focal_x = retina_bottom + focal_point_position * (lens_top - retina_bottom)
+                focal_y = np.mean(lens_spans[1])
+                focal_z = np.mean(lens_spans[2])
+
+            elif split_plane == 'y+':
+                lens_top, retina_bottom = max(lens_spans[1]), min(retinas_spans[1])
+                focal_y = retina_bottom + focal_point_position * (lens_top - retina_bottom)
+                focal_x = np.mean(lens_spans[0])
+                focal_z = np.mean(lens_spans[2])
+
+            elif split_plane == 'y-':
+                lens_top, retina_bottom = min(lens_spans[1]), max(retinas_spans[1])
+                focal_y = retina_bottom + focal_point_position * (lens_top - retina_bottom)
+                focal_x = np.mean(lens_spans[0])
+                focal_z = np.mean(lens_spans[2])
+
+            elif split_plane == 'z+':
+                lens_top, retina_bottom = max(lens_spans[2]), min(retinas_spans[2])
+                focal_z = retina_bottom + focal_point_position * (lens_top - retina_bottom)
+                focal_x = np.mean(lens_spans[0])
+                focal_y = np.mean(lens_spans[1])
+
+            elif split_plane == 'z-':
+                lens_top, retina_bottom = min(lens_spans[2]), max(retinas_spans[2])
+                focal_z = retina_bottom + focal_point_position * (lens_top - retina_bottom)
+                focal_x = np.mean(lens_spans[0])
+                focal_y = np.mean(lens_spans[1])
+
+            radius = abs(lens_top - retina_bottom)
+
+            self.RotatedLensSphere = radius, np.array([focal_x, focal_y, focal_z])
+
 
     def rotate_back(self):
         """
@@ -917,26 +966,30 @@ class Spider:
             for blob in ["Lens", "Retina"]:
                 self.eyes[eye].find_points(piclist=self.SeparateLabelPictures[eye][blob], part=blob, style=style)
 
-    def compute_eye(self, eye):
+    def compute_eye(self, eye, focal_point_type='sphere', focal_point_position=0.5):
         """
         helper function to do all the required computation for each eye. look into class eye for each single function
-        :param eye: eye identity. can be AME, ALE, PME, PLE
+
+        :param eye: the name of the eye
+        :param focal_point_type: can be either sphere or given
+        :param focal_point_position: if focal_point_type is given, this is the position of the focal point as relative distance
+        between lens and retina
         """
         if eye in self.available_eyes:
             self.eyes[eye].define_all_clouds()
             self.eyes[eye].align_to_zero()
-            self.eyes[eye].find_lens_sphere()
+            self.eyes[eye].find_lens_sphere(focal_point_type, focal_point_position)
             self.eyes[eye].rotate_back()
         else:
             raise(UnrecognizedEye("Unrecognized Eye: Computation aborted."))
 
-    def compute_eyes(self):
+    def compute_eyes(self, focal_point_type='sphere', focal_point_position=0.5):
         """
         run this! compute all eyes together
         """
         print('Computing lenses and retina geometries...', end='')
         for eye in self.available_eyes:
-            self.compute_eye(eye)
+            self.compute_eye(eye, focal_point_type, focal_point_position)
         print(' Done')
 
     def compute_cephalothorax(self, style='binary'):

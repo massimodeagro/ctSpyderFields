@@ -14,7 +14,6 @@ import yaml
 
 ### PLOTTING
 import matplotlib.pyplot as plt
-from matplotlib import cm
 import plotly.graph_objects as go
 
 import copy
@@ -82,7 +81,10 @@ class Eye:
         self.focalLengthsFull = []
         self.FOVcontourPoints = None
 
-        self.spherical_coordinates = {}
+        self.spherical_coordinates = {'overlaps': {},
+                                      'spherical_points': {},
+                                      'azimuth_max_spans': {},
+                                      'elevation_max_spans': {}}
 
     '''
     def amira_find_lens_points(self, labels_pictures_list):
@@ -179,7 +181,7 @@ class Eye:
         self.RotatedRetinaCloud = trimesh.points.PointCloud(self.RotatedRetinaPoints)
         ### The points expressed in SoR {Camera} are expressed now in the {Lens} SoR
 
-    def find_split_plane(self): #TODO porcata di massimo
+    def find_split_plane(self):
         """
         this function finds the plane (xy, xz, yz) that divides retina from lens,
         as well as on which side of the two is the retina and on which is the lens.
@@ -223,23 +225,30 @@ class Eye:
             if overlapX < overlapY and overlapX < overlapZ:
                 if LensSpanX[0] > RetinaSpanX[0]:
                     mask = self.RotatedLensCloud.convex_hull.vertices[:, 0] > 0
+                    split_plane = 'x+'
                 else:
                     mask = self.RotatedLensCloud.convex_hull.vertices[:, 0] < 0
+                    split_plane = 'x-'
             elif overlapY < overlapX and overlapY < overlapZ:
                 if LensSpanY[0] > RetinaSpanY[0]:
                     mask = self.RotatedLensCloud.convex_hull.vertices[:, 1] > 0
+                    split_plane = 'y+'
                 else:
                     mask = self.RotatedLensCloud.convex_hull.vertices[:, 1] < 0
+                    split_plane = 'y-'
             elif overlapZ < overlapX and overlapZ < overlapY:
                 if LensSpanZ[0] > RetinaSpanZ[0]:
                     mask = self.RotatedLensCloud.convex_hull.vertices[:, 2] > 0
+                    split_plane = 'z+'
                 else:
                     mask = self.RotatedLensCloud.convex_hull.vertices[:, 2] < 0
-            
+                    split_plane = 'z-'
+
             self.RotatedLensSurfacePoints = self.RotatedLensCloud.convex_hull.vertices[mask, :]
         else:
             print("cry")  # TODO: do a better error catching process
             pass
+        return split_plane, [LensSpanX, LensSpanY, LensSpanZ], [RetinaSpanX, RetinaSpanY, RetinaSpanZ]
 
     def sphere_fit(self, point_cloud):
         """
@@ -283,13 +292,54 @@ class Eye:
 
         return (radius, sphere_center)
 
-    def find_lens_sphere(self):
+    def find_lens_sphere(self, focal_point_type, focal_point_position):
         """
         helper function, call the two previous formulas to do everything in one step
         """
-        self.find_split_plane()
-        self.RotatedLensSphere = self.sphere_fit(self.RotatedLensSurfacePoints)
-        #TODO catch if sphere fit found a center with value < min retina
+        split_plane, lens_spans, retinas_spans = self.find_split_plane()
+        if focal_point_type == 'sphere':
+            self.RotatedLensSphere = self.sphere_fit(self.RotatedLensSurfacePoints)
+        else:
+            if split_plane == 'x+':
+                lens_top, retina_bottom = max(lens_spans[0]), min(retinas_spans[0])
+                focal_x = retina_bottom + focal_point_position * (lens_top - retina_bottom)
+                focal_y = np.mean(lens_spans[1])
+                focal_z = np.mean(lens_spans[2])
+
+            elif split_plane == 'x-':
+                lens_top, retina_bottom = min(lens_spans[0]), max(retinas_spans[0])
+                focal_x = retina_bottom + focal_point_position * (lens_top - retina_bottom)
+                focal_y = np.mean(lens_spans[1])
+                focal_z = np.mean(lens_spans[2])
+
+            elif split_plane == 'y+':
+                lens_top, retina_bottom = max(lens_spans[1]), min(retinas_spans[1])
+                focal_y = retina_bottom + focal_point_position * (lens_top - retina_bottom)
+                focal_x = np.mean(lens_spans[0])
+                focal_z = np.mean(lens_spans[2])
+
+            elif split_plane == 'y-':
+                lens_top, retina_bottom = min(lens_spans[1]), max(retinas_spans[1])
+                focal_y = retina_bottom + focal_point_position * (lens_top - retina_bottom)
+                focal_x = np.mean(lens_spans[0])
+                focal_z = np.mean(lens_spans[2])
+
+            elif split_plane == 'z+':
+                lens_top, retina_bottom = max(lens_spans[2]), min(retinas_spans[2])
+                focal_z = retina_bottom + focal_point_position * (lens_top - retina_bottom)
+                focal_x = np.mean(lens_spans[0])
+                focal_y = np.mean(lens_spans[1])
+
+            elif split_plane == 'z-':
+                lens_top, retina_bottom = min(lens_spans[2]), max(retinas_spans[2])
+                focal_z = retina_bottom + focal_point_position * (lens_top - retina_bottom)
+                focal_x = np.mean(lens_spans[0])
+                focal_y = np.mean(lens_spans[1])
+
+            radius = abs(lens_top - retina_bottom)
+
+            self.RotatedLensSphere = radius, np.array([focal_x, focal_y, focal_z])
+
 
     def rotate_back(self):
         """
@@ -656,6 +706,128 @@ class Eye:
         self.spherical_coordinates['azimuth_max_spans']['general_discretization'] = azimuth_max_spans
         self.spherical_coordinates['elevation_max_spans']['general_discretization'] = elevation_max_spans
 
+    def compute_arbitraryOverlap(self, comparator_identity, other_eye_data):
+        self.spherical_coordinates['overlaps'][comparator_identity] = {}
+        self.spherical_coordinates['overlaps'][comparator_identity]['azimuth'] = \
+            {'general_discretization': {'elevation_range': [], 'span': [], 'extremes': []}}
+
+        elevation_range = self.spherical_coordinates['azimuth_max_spans']['general_discretization'][
+            'elevation_range']
+        focuseye_azimuth_span = self.spherical_coordinates['azimuth_max_spans']['general_discretization']['extremes']
+        comparatoreye_azimuth_span = other_eye_data['azimuth_max_spans']['general_discretization']['extremes']
+
+        for ran, focus_extremes, comparator_extremes in zip(elevation_range, focuseye_azimuth_span, comparatoreye_azimuth_span):
+            self.spherical_coordinates['overlaps'][comparator_identity]['azimuth']['general_discretization']['elevation_range'].append(ran)
+            focus_extremes = sorted(focus_extremes)
+            comparator_extremes = sorted(comparator_extremes)
+
+            # Calculate the start and end of the overlap range
+            start_overlap = max(focus_extremes[0], comparator_extremes[0])
+            end_overlap = min(focus_extremes[1], comparator_extremes[1])
+            if start_overlap < end_overlap:
+                overlap_range = [start_overlap, end_overlap]
+                self.spherical_coordinates['overlaps'][comparator_identity]['azimuth']['general_discretization'][
+                    'extremes'].append(overlap_range)
+                self.spherical_coordinates['overlaps'][comparator_identity]['azimuth']['general_discretization'][
+                    'span'].append(np.diff(overlap_range))
+            else:
+                self.spherical_coordinates['overlaps'][comparator_identity]['azimuth']['general_discretization'][
+                    'extremes'].append([np.nan, np.nan])
+                self.spherical_coordinates['overlaps'][comparator_identity]['azimuth']['general_discretization'][
+                    'span'].append(np.nan)
+
+        self.spherical_coordinates['overlaps'][comparator_identity]['elevation'] = \
+            {'general_discretization': {'azimuth_range': [], 'span': [], 'extremes': []}}
+
+        azimuth_range = self.spherical_coordinates['elevation_max_spans']['general_discretization'][
+            'azimuth_range']
+        focuseye_elevation_span = self.spherical_coordinates['elevation_max_spans']['general_discretization']['extremes']
+        comparatoreye_elevation_span = other_eye_data['elevation_max_spans']['general_discretization']['extremes']
+
+        for ran, focus_extremes, comparator_extremes in zip(azimuth_range, focuseye_elevation_span, comparatoreye_elevation_span):
+            self.spherical_coordinates['overlaps'][comparator_identity]['elevation']['general_discretization'][
+                'azimuth_range'].append(ran)
+            focus_extremes = sorted(focus_extremes)
+            comparator_extremes = sorted(comparator_extremes)
+
+            # Calculate the start and end of the overlap range
+            start_overlap = max(focus_extremes[0], comparator_extremes[0])
+            end_overlap = min(focus_extremes[1], comparator_extremes[1])
+            if start_overlap < end_overlap:
+                overlap_range = [start_overlap, end_overlap]
+                self.spherical_coordinates['overlaps'][comparator_identity]['elevation']['general_discretization'][
+                    'extremes'].append(overlap_range)
+                self.spherical_coordinates['overlaps'][comparator_identity]['elevation']['general_discretization'][
+                    'span'].append(np.diff(overlap_range))
+            else:
+                self.spherical_coordinates['overlaps'][comparator_identity]['elevation']['general_discretization'][
+                    'extremes'].append([np.nan, np.nan])
+                self.spherical_coordinates['overlaps'][comparator_identity]['elevation']['general_discretization'][
+                    'span'].append(np.nan)
+
+    def compute_binocularOverlap(self, disc='specific'):
+        if disc != 'specific' and disc != 'general':
+            raise ValueError('non recognized discretization. check.')
+        self.spherical_coordinates['overlaps']['binocular'] = {}
+        self.spherical_coordinates['overlaps']['binocular']['azimuth'] = \
+            {disc+'_discretization': {'elevation_range':[],'span':[], 'extremes':[]}}
+
+        elevation_range = self.spherical_coordinates['azimuth_max_spans'][disc+'_discretization'][
+            'elevation_range']
+        azimuth_span = self.spherical_coordinates['azimuth_max_spans'][disc+'_discretization']['extremes']
+        for ran, extremes in zip(elevation_range, azimuth_span):
+            self.spherical_coordinates['overlaps']['binocular']['azimuth'][disc+'_discretization']['elevation_range'].append(ran)
+            flip_extremes = extremes*-1
+            if len(flip_extremes) == 0:
+                flip_extremes = [np.nan, np.nan]
+            extremes = sorted(extremes)
+            flip_extremes = sorted(flip_extremes)
+
+            # Calculate the start and end of the overlap range
+            start_overlap = max(extremes[0], flip_extremes[0])
+            end_overlap = min(extremes[1], flip_extremes[1])
+            if start_overlap < end_overlap:
+                overlap_range = [start_overlap, end_overlap]
+                self.spherical_coordinates['overlaps']['binocular']['azimuth'][disc+'_discretization'][
+                    'extremes'].append(overlap_range)
+                self.spherical_coordinates['overlaps']['binocular']['azimuth'][disc+'_discretization'][
+                    'span'].append(np.diff(overlap_range))
+            else:
+                self.spherical_coordinates['overlaps']['binocular']['azimuth'][disc+'_discretization'][
+                    'extremes'].append([np.nan, np.nan])
+                self.spherical_coordinates['overlaps']['binocular']['azimuth'][disc+'_discretization'][
+                    'span'].append(np.nan)
+
+        self.spherical_coordinates['overlaps']['binocular']['elevation'] = \
+            {disc+'_discretization': {'azimuth_range': [], 'span': [], 'extremes': []}}
+
+        azimuth_range = self.spherical_coordinates['elevation_max_spans'][disc+'_discretization'][
+            'azimuth_range']
+        elevation_span = self.spherical_coordinates['elevation_max_spans'][disc+'_discretization']['extremes']
+        for ran, extremes in zip(azimuth_range, elevation_span):
+            self.spherical_coordinates['overlaps']['binocular']['elevation'][disc+'_discretization'][
+                'azimuth_range'].append(ran)
+            flip_extremes = extremes * -1
+            if len(flip_extremes) == 0:
+                flip_extremes = [np.nan, np.nan]
+            extremes = sorted(extremes)
+            flip_extremes = sorted(flip_extremes)
+
+            # Calculate the start and end of the overlap range
+            start_overlap = max(extremes[0], flip_extremes[0])
+            end_overlap = min(extremes[1], flip_extremes[1])
+            if start_overlap < end_overlap:
+                overlap_range = [start_overlap, end_overlap]
+                self.spherical_coordinates['overlaps']['binocular']['elevation'][disc+'_discretization'][
+                    'extremes'].append(overlap_range)
+                self.spherical_coordinates['overlaps']['binocular']['elevation'][disc+'_discretization'][
+                    'span'].append(np.diff(overlap_range))
+            else:
+                self.spherical_coordinates['overlaps']['binocular']['elevation'][disc+'_discretization'][
+                    'extremes'].append([np.nan, np.nan])
+                self.spherical_coordinates['overlaps']['binocular']['elevation'][disc+'_discretization'][
+                    'span'].append(np.nan)
+
   
 class Spider:
     """
@@ -769,6 +941,7 @@ class Spider:
                 self.SeparateLabelPictures[group][object].append(cv2.imread(self.path + file, 0))
             elif style == 'color':
                 self.SeparateLabelPictures[group][object].append(cv2.imread(self.path + file, 1))
+
     def load_all_labels_split(self,  style='binary'):
         """
         This function calls dragonfly_load_label for 4 + 7 times
@@ -799,26 +972,30 @@ class Spider:
             for blob in ["Lens", "Retina"]:
                 self.eyes[eye].find_points(piclist=self.SeparateLabelPictures[eye][blob], part=blob, style=style)
 
-    def compute_eye(self, eye):
+    def compute_eye(self, eye, focal_point_type='sphere', focal_point_position=0.5):
         """
         helper function to do all the required computation for each eye. look into class eye for each single function
-        :param eye: eye identity. can be AME, ALE, PME, PLE
+
+        :param eye: the name of the eye
+        :param focal_point_type: can be either sphere or given
+        :param focal_point_position: if focal_point_type is given, this is the position of the focal point as relative distance
+        between lens and retina
         """
         if eye in self.available_eyes:
             self.eyes[eye].define_all_clouds()
             self.eyes[eye].align_to_zero()
-            self.eyes[eye].find_lens_sphere()
+            self.eyes[eye].find_lens_sphere(focal_point_type, focal_point_position)
             self.eyes[eye].rotate_back()
         else:
             raise(UnrecognizedEye("Unrecognized Eye: Computation aborted."))
 
-    def compute_eyes(self):
+    def compute_eyes(self, focal_point_type='sphere', focal_point_position=0.5):
         """
         run this! compute all eyes together
         """
         print('Computing lenses and retina geometries...', end='')
         for eye in self.available_eyes:
-            self.compute_eye(eye)
+            self.compute_eye(eye, focal_point_type, focal_point_position)
         print(' Done')
 
     def compute_cephalothorax(self, style='binary'):
@@ -1162,15 +1339,48 @@ class Spider:
                                                        voxel_size=self.voxelSize)
         return spans
 
-    #TODO I am not sure this works still. Ask Daniele
     def sphericalCoordinates_compute(self, eyes=("AME", "ALE", "PME", "PLE"), specific_discretization=15, general_discretization=72):
 
         # Extract Information
         for eye in eyes:
-            self.eyes[eye].calculate_span2(specific_discretization, general_discretization)
+            if eye in self.available_eyes:
+                self.eyes[eye].calculate_span2(specific_discretization, general_discretization)
 
-    def sphericalCoordinates_save(self, eyes=("AME", "ALE", "PME", "PLE"), raw=False, span=False, overlap=False):
+    def binocularOverlap_compute(self, eyes=("AME", "ALE", "PME", "PLE")):
+        for eye in eyes:
+            if eye in self.available_eyes:
+                self.eyes[eye].compute_binocularOverlap(disc='specific')
+                self.eyes[eye].compute_binocularOverlap(disc='general')
+
+    def multiEyeOverlap_compute(self, eyes=("AME", "ALE", "PME", "PLE")):
+        for focus_eye in eyes:
+            for compare_eye in eyes:
+                if focus_eye != compare_eye:
+                    if focus_eye in self.available_eyes and compare_eye in self.available_eyes:
+                        compare_data = self.eyes[compare_eye].spherical_coordinates
+                        self.eyes[focus_eye].compute_arbitraryOverlap(compare_eye, compare_data)
+
+
+    def sphericalCoordinates_save(self, filename, eyes=("AME", "ALE", "PME", "PLE"), summary=False):
+        for eye in self.eyes:
+            if eye in self.available_eyes:
+                spherical_points = pd.DataFrame(self.eyes[eye].spherical_coordinates['spherical_points'])
+                spherical_points.to_csv(self.path+filename+'_'+eye+'_spherical_points.csv')
+
+                eyeSummary_specific = {}
+                az_specific = self.eyes[eye].spherical_coordinates['azimuth_max_spans']['specific_discretization']
+                eyeSummary_specific['elevation_bin_min'] = np.array(az_specific['elevation_range'])[:,0]
+                eyeSummary_specific['elevation_bin_max'] = np.array(az_specific['elevation_range'])[:,1]
+                eyeSummary_specific['span'] = np.array(az_specific['span'])
+                eyeSummary_specific['angle_span_max'] = np.array(az_specific['extremes'])[:,0]
+                eyeSummary_specific['angle_span_min'] = np.array(az_specific['extremes'])[:,1]
+
+                #TODO: FINISH
+
+
+
         pass
+
     def sphericalCoordinates_plotSorted(self, eyes=("AME", "ALE", "PME", "PLE")):
 
         fig, axs = plt.subplots(1,2)
@@ -1195,6 +1405,7 @@ class Spider:
         axs[1].set_title('Elevation')
         axs[1].legend()
         fig.show()
+
     def sphericalCoordinates_plotFields(self, eyes=("AME", "ALE", "PME", "PLE"), ret=False):
         fig, ax = plt.subplots()
         for eye in eyes:
@@ -1217,33 +1428,38 @@ class Spider:
             if disc=='general':
                 az = self.eyes[eye].spherical_coordinates['azimuth_max_spans']['general_discretization']
                 el = self.eyes[eye].spherical_coordinates['elevation_max_spans']['general_discretization']
-            if disc=='specific':
+            elif disc=='specific':
                 az = self.eyes[eye].spherical_coordinates['azimuth_max_spans']['specific_discretization']
                 el = self.eyes[eye].spherical_coordinates['elevation_max_spans']['specific_discretization']
+            else:
+                raise ValueError("undefined disdcretization. please check")
 
-            aznames = [a[0] for a in az['elevation_range']]
-            elnames = [e[0] for e in el['azimuth_range']]
+            aznames = np.rad2deg(np.array(az['elevation_range']).flatten())
+            azvals = np.rad2deg(np.repeat(az['span'], 2))
+            elnames = np.rad2deg(np.array(el['azimuth_range']).flatten())
+            elvals = np.rad2deg(np.repeat(el['span'], 2))
 
             # Span
-            axs[0].plot(aznames,
-                        az['span'],
-                        '--', linewidth=2, label='Span of' + eye, color=self.toplot_colors[eye])
-            axs[1].plot(elnames,
-                        el['span'],
-                        '--', linewidth=2, label='Span of' + eye, color=self.toplot_colors[eye])
+            axs[1].plot(azvals,
+                        aznames, label='Span of ' + eye, color=self.toplot_colors[eye])
+            axs[0].plot(elnames,
+                        elvals, label='Span of ' + eye, color=self.toplot_colors[eye])
+
         # Span
         axs[0].grid()
-        axs[0].set_xlabel('Azimuth [rad]')
-        axs[0].set_ylabel('Elevation [rad]')
-        axs[0].set_title("Span in Elevation")
-        axs[0].set_xlim(-np.pi, np.pi)
+        axs[0].set_xlabel('Azimuth Range')
+        axs[0].set_ylabel('Elevation')
+        axs[0].set_title("FOV elevation span per azimuth window")
+        axs[0].set_xlim(-180, 180)
+        axs[0].set_ylim(0, 180)
         axs[0].legend()
 
         axs[1].grid()
-        axs[1].set_xlabel('Elevation [rad]')
-        axs[1].set_ylabel('Azimuth [rad]')
-        axs[1].set_title("Span in Azimuth")
-        axs[1].set_xlim(-np.pi/2.0, np.pi/2.0)
+        axs[1].set_xlabel('Azimuth')
+        axs[1].set_ylabel('Elevation Range')
+        axs[1].set_title("FOV azimuth span per elevation window")
+        axs[1].set_xlim(0, 180)
+        axs[1].set_ylim(-180, 180)
         axs[1].legend()
         fig.show()
 

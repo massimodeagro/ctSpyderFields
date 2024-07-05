@@ -627,7 +627,7 @@ class Eye:
 
             if len(current_points) < 2:
                 elevation_max_spans['span'].append(np.nan)
-                elevation_max_spans['extremes'].append(np.nan, np.nan)
+                elevation_max_spans['extremes'].append([np.nan, np.nan])
 
             else:
                 spans = self.pairwise_angle_diff(spherical_points[current_points, 2])

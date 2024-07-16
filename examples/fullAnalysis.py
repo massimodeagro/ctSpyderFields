@@ -28,3 +28,4 @@ GenusSpecies.sphericalCoordinates_plotSpans(disc='specific')
 
 # GenusSpecies.plot_pyplot(elements=("FOVoutline"))
 GenusSpecies.plot_matplotlib(elements=("FOVoutline"))
+GenusSpecies.sphericalCoordinates_save(filename='PhilaeusChrysops')

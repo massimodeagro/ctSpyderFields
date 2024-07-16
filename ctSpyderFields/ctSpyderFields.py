@@ -729,7 +729,7 @@ class Eye:
                 self.spherical_coordinates['overlaps'][comparator_identity]['azimuth']['general_discretization'][
                     'extremes'].append(overlap_range)
                 self.spherical_coordinates['overlaps'][comparator_identity]['azimuth']['general_discretization'][
-                    'span'].append(np.diff(overlap_range))
+                    'span'].append(np.diff(overlap_range)[0])
             else:
                 self.spherical_coordinates['overlaps'][comparator_identity]['azimuth']['general_discretization'][
                     'extremes'].append([np.nan, np.nan])
@@ -758,7 +758,7 @@ class Eye:
                 self.spherical_coordinates['overlaps'][comparator_identity]['elevation']['general_discretization'][
                     'extremes'].append(overlap_range)
                 self.spherical_coordinates['overlaps'][comparator_identity]['elevation']['general_discretization'][
-                    'span'].append(np.diff(overlap_range))
+                    'span'].append(np.diff(overlap_range)[0])
             else:
                 self.spherical_coordinates['overlaps'][comparator_identity]['elevation']['general_discretization'][
                     'extremes'].append([np.nan, np.nan])
@@ -791,7 +791,7 @@ class Eye:
                 self.spherical_coordinates['overlaps']['binocular']['azimuth'][disc+'_discretization'][
                     'extremes'].append(overlap_range)
                 self.spherical_coordinates['overlaps']['binocular']['azimuth'][disc+'_discretization'][
-                    'span'].append(np.diff(overlap_range))
+                    'span'].append(np.diff(overlap_range)[0])
             else:
                 self.spherical_coordinates['overlaps']['binocular']['azimuth'][disc+'_discretization'][
                     'extremes'].append([np.nan, np.nan])
@@ -821,7 +821,7 @@ class Eye:
                 self.spherical_coordinates['overlaps']['binocular']['elevation'][disc+'_discretization'][
                     'extremes'].append(overlap_range)
                 self.spherical_coordinates['overlaps']['binocular']['elevation'][disc+'_discretization'][
-                    'span'].append(np.diff(overlap_range))
+                    'span'].append(np.diff(overlap_range)[0])
             else:
                 self.spherical_coordinates['overlaps']['binocular']['elevation'][disc+'_discretization'][
                     'extremes'].append([np.nan, np.nan])
@@ -1359,25 +1359,101 @@ class Spider:
                         self.eyes[focus_eye].compute_arbitraryOverlap(compare_eye, compare_data)
 
 
-    def sphericalCoordinates_save(self, filename, eyes=("AME", "ALE", "PME", "PLE"), summary=False):
-        for eye in self.eyes:
+    def sphericalCoordinates_save(self, filename, eyes=("AME", "ALE", "PME", "PLE"),
+                                  disc=('specific', 'general'), overlap=('binocular', 'multieye')):
+        if 'general' in disc:
+            eyeSummary_general_azimuth = {}
+            eyeSummary_general_elevation = {}
+        for eye in eyes:
             if eye in self.available_eyes:
                 spherical_points = pd.DataFrame(self.eyes[eye].spherical_coordinates['spherical_points'])
                 spherical_points.to_csv(self.path+filename+'_'+eye+'_spherical_points.csv')
+                if 'general' in disc:
+                    data = self.eyes[eye].spherical_coordinates['azimuth_max_spans'][
+                        'general_discretization']
+                    if 'elevation_bin_min' not in list(eyeSummary_general_azimuth.keys()):
+                        eyeSummary_general_azimuth['elevation_bin_min'] = np.array(data['elevation_range'])[:, 0]
+                        eyeSummary_general_azimuth['elevation_bin_max'] = np.array(data['elevation_range'])[:, 1]
+                    eyeSummary_general_azimuth[eye+'_span'] = np.array(data['span'])
+                    eyeSummary_general_azimuth[eye+'_angle_span_max'] = np.array(data['extremes'])[:, 0]
+                    eyeSummary_general_azimuth[eye+'_angle_span_min'] = np.array(data['extremes'])[:, 1]
 
-                eyeSummary_specific = {}
-                az_specific = self.eyes[eye].spherical_coordinates['azimuth_max_spans']['specific_discretization']
-                eyeSummary_specific['elevation_bin_min'] = np.array(az_specific['elevation_range'])[:,0]
-                eyeSummary_specific['elevation_bin_max'] = np.array(az_specific['elevation_range'])[:,1]
-                eyeSummary_specific['span'] = np.array(az_specific['span'])
-                eyeSummary_specific['angle_span_max'] = np.array(az_specific['extremes'])[:,0]
-                eyeSummary_specific['angle_span_min'] = np.array(az_specific['extremes'])[:,1]
+                    if 'binocular' in overlap:
+                        data = self.eyes[eye].spherical_coordinates['overlaps']['binocular']['azimuth'][
+                            'general_discretization']
+                        eyeSummary_general_azimuth[eye + '_binocularOverlap_span'] = np.array(data['span'])
+                        eyeSummary_general_azimuth[eye + '_binocularOverlap_angle_span_max'] = np.array(data['extremes'])[:, 0]
+                        eyeSummary_general_azimuth[eye + '_binocularOverlap_angle_span_min'] = np.array(data['extremes'])[:, 1]
 
-                #TODO: FINISH
+                    if 'multieye' in overlap:
+                        other_eyes = list(self.eyes[eye].spherical_coordinates['overlaps'].keys())
+                        if 'binocular' in other_eyes:
+                            other_eyes.remove('binocular')
+                        for other_eye in other_eyes:
+                            data = self.eyes[eye].spherical_coordinates['overlaps'][other_eye]['azimuth'][
+                                'general_discretization']
+                            eyeSummary_general_azimuth[eye + 'to' + other_eye + 'overlap_span'] = np.array(data['span'])
+                            eyeSummary_general_azimuth[eye + 'to' + other_eye + 'overlap_angle_span_max'] = np.array(
+                                data['extremes'])[:, 0]
+                            eyeSummary_general_azimuth[eye + 'to' + other_eye + 'overlap_angle_span_min'] = np.array(
+                                data['extremes'])[:, 1]
 
 
+                    data = self.eyes[eye].spherical_coordinates['elevation_max_spans'][
+                        'general_discretization']
+                    if 'azimuth_bin_min' not in list(eyeSummary_general_elevation.keys()):
+                        eyeSummary_general_elevation['azimuth_bin_min'] = np.array(data['azimuth_range'])[:, 0]
+                        eyeSummary_general_elevation['azimuth_bin_max'] = np.array(data['azimuth_range'])[:, 1]
+                    eyeSummary_general_elevation[eye+'_span'] = np.array(data['span'])
+                    eyeSummary_general_elevation[eye+'_angle_span_max'] = np.array(data['extremes'])[:, 0]
+                    eyeSummary_general_elevation[eye+'_angle_span_min'] = np.array(data['extremes'])[:, 1]
 
-        pass
+                    if 'binocular' in overlap:
+                        data = self.eyes[eye].spherical_coordinates['overlaps']['binocular']['elevation'][
+                            'general_discretization']
+                        eyeSummary_general_elevation[eye + '_binocularOverlap_span'] = np.array(data['span'])
+                        eyeSummary_general_elevation[eye + '_binocularOverlap_angle_span_max'] = np.array(data['extremes'])[:, 0]
+                        eyeSummary_general_elevation[eye + '_binocularOverlap_angle_span_min'] = np.array(data['extremes'])[:, 1]
+
+                    if 'multieye' in overlap:
+                        other_eyes = list(self.eyes[eye].spherical_coordinates['overlaps'].keys())
+                        if 'binocular' in other_eyes:
+                            other_eyes.remove('binocular')
+                        for other_eye in other_eyes:
+                            data = self.eyes[eye].spherical_coordinates['overlaps'][other_eye]['elevation'][
+                                'general_discretization']
+                            eyeSummary_general_elevation[eye + 'to' + other_eye + 'overlap_span'] = np.array(data['span'])
+                            eyeSummary_general_elevation[eye + 'to' + other_eye + 'overlap_angle_span_max'] = np.array(
+                                data['extremes'])[:, 0]
+                            eyeSummary_general_elevation[eye + 'to' + other_eye + 'overlap_angle_span_min'] = np.array(
+                                data['extremes'])[:, 1]
+
+                if 'specific' in disc:
+                    for span_type in ['azimuth', 'elevation']:
+                        eyeSummary_specific = {}
+                        data = self.eyes[eye].spherical_coordinates[span_type + '_max_spans'][
+                            'specific_discretization']
+                        if span_type == 'azimuth':
+                            eyeSummary_specific['elevation_bin_min'] = np.array(data['elevation_range'])[:, 0]
+                            eyeSummary_specific['elevation_bin_max'] = np.array(data['elevation_range'])[:, 1]
+                        elif span_type == 'elevation':
+                            eyeSummary_specific['azimuth_bin_min'] = np.array(data['azimuth_range'])[:, 0]
+                            eyeSummary_specific['azimuth_bin_max'] = np.array(data['azimuth_range'])[:, 1]
+                        eyeSummary_specific['span'] = np.array(data['span'])
+                        eyeSummary_specific['angle_span_max'] = np.array(data['extremes'])[:, 0]
+                        eyeSummary_specific['angle_span_min'] = np.array(data['extremes'])[:, 1]
+                        eyeSummary_specific = pd.DataFrame(eyeSummary_specific)
+                        eyeSummary_specific.to_csv(
+                            self.path + filename + '_' + eye + '_' + span_type + 'Spans_specificDiscretization.csv')
+
+        if 'general' in disc:
+            eyeSummary_general_azimuth = pd.DataFrame(eyeSummary_general_azimuth)
+            eyeSummary_general_azimuth.to_csv(
+                self.path + filename + '_AzimuthSpans_generalDiscretization.csv')
+            eyeSummary_general_elevation = pd.DataFrame(eyeSummary_general_elevation)
+            eyeSummary_general_elevation.to_csv(
+                self.path + filename + '_ElevationSpans_generalDiscretization.csv')
+
 
     def sphericalCoordinates_plotSorted(self, eyes=("AME", "ALE", "PME", "PLE")):
 

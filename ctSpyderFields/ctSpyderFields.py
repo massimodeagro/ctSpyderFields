@@ -998,7 +998,7 @@ class Spider:
             self.compute_eye(eye, focal_point_type, focal_point_position)
         print(' Done')
 
-    def compute_cephalothorax(self, style='binary'):
+    def find_cephalothorax_points(self, style='binary'):
         """
         this first translates the binary pictures in a set of points, and then find the center
         """
@@ -1024,7 +1024,7 @@ class Spider:
 
         # Compute the SoR of the Head
         # This matrix maps: global (camera) -> local (spider)
-        self.spider_SoR = np.linalg.inv(self.head_SoR(plot=False))    # [4, 4] \in SE(3)
+        #self.head_SoR()   # [4, 4] \in SE(3)
 
 
     #it seems that this now needs dropping

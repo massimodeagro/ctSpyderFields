@@ -21,7 +21,7 @@ labelnames = {'AME': {'Lens': 'Lens_AME', 'Retina': 'Retina_AME'},
 GenusSpecies = ctSpyderFields.Spider(workdir=path, label_names=labelnames, voxelsize=0.001, paramspath=paramspath)
 GenusSpecies.load_all_labels_split(style='color')
 GenusSpecies.find_eyes_points(style='color')
-GenusSpecies.compute_cephalothorax(style='color')
+GenusSpecies.find_cephalothorax_points(style='color')
 GenusSpecies.compute_eyes()
 # GenusSpecies.orient_to_standard()
 GenusSpecies.from_std_to_head()

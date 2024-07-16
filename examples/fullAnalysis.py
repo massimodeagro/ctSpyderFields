@@ -11,7 +11,7 @@ paramspath = '/home/massimodeagro/CTspyderFields/ctSpyderFields/examples/params.
 # IF STARTING FROM PICKLE
 GenusSpecies = Ct.Spider(workdir=path, voxelsize=0.003, paramspath=paramspath)
 GenusSpecies.load(filename='PhilaeusChrysops', type='pickle')
-GenusSpecies.spider_SoR = np.linalg.inv(GenusSpecies.head_SoR(flipZ=True, plot=True))  # [4, 4] \in SE(3)
+GenusSpecies.head_SoR(flipZ=True, plot=True)  # [4, 4] \in SE(3)
 
 GenusSpecies.compute_eyes(focal_point_type='given', focal_point_position=0.75)
 GenusSpecies.from_std_to_head()

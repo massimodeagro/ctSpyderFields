@@ -1181,7 +1181,7 @@ class Spider:
         T = np.concatenate((R, np.array([origin]).T), axis=1)
         T = np.concatenate((T, np.array([[0, 0, 0, 1]])), axis=0)
 
-        return T
+        self.spider_SoR = np.linalg.inv(T)
 
     def save(self, filename, type="pickle"):
         """

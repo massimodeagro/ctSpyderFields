@@ -1,0 +1,143 @@
+# Usage guide
+
+This readme will guide you through the use the software from data (images coming from a segmented CT) to fields (plots and raw data export)
+
+For a guide on how to install the software go to install.md, for how to prepare CT scans, go to data_preparation.md
+
+## Load packages
+As a first step, let's load the library and other needed packages
+
+```python
+from ctSpyderFields import ctSpyderFields
+import numpy as np
+```
+
+## Definitions
+Now, let's provide some definitions. These are specific to your machine and data
+
+```python
+path = '/path/to/foder/where/image/data/is/located/' #remember the final "/"
+paramspath = 'path/to/where/parameters/for/images/is/located/params.yaml'
+```
+
+params.yaml contains the color definition for importing points from image stack from AMIRA/DRAGONFLY. This is needed if the image stack presents different ROIs with different colors. Provide in the yaml the RGB value for each ROIs, giving a minimum and a maximum value (images may not be precise and especially around the edges may blur slightly with the background). An example params.yaml is provided for the structure
+
+```python
+labelnames = {'AME': {'Lens': 'Lens_AME', 'Retina': 'Retina_AME'},
+                  'ALE': {'Lens': 'Lens_ALE', 'Retina': 'Retina_ALE'},
+                  'PME': {'Lens': 'Lens_PME', 'Retina': 'Retina_PME'},
+                  'PLE': {'Lens': 'Lens_PLE', 'Retina': 'Retina_PLE'},
+                  'Markers': {'center': 'Marker_center',
+                              'front': 'Marker_front', 'back': 'Marker_back',
+                              'bottom': 'Marker_bottom', 'top': 'Marker_top',
+                              'left': 'Marker_left', 'right': 'Marker_right'}}
+```
+labelnames dictionary provides the name of the image stack associated with each ROI. Change them accordingly to your image naming (e.g., instead of 'Lens_AME' write 'Image_name_without_incremental_number_nor_file_type'). If the same image stack contains more than one ROI in different colors, provide the same text (e.g. {'AME': {'Lens': 'Full_AME_image_name', 'Retina': 'Full_AME_image_name'})
+
+## Import image stacks
+First, we create the object
+
+```python
+MySpiderObjectName = ctSpyderFields.Spider(workdir=path, label_names=labelnames, voxelsize=0.001, paramspath=paramspath) 
+# remember to set voxelsize as given by your CT analysis software
+```
+
+Then, we load the images.
+
+If you are using an image stack where ROIs have different colors, or in general the images are RGB, use
+
+```python
+MySpiderObjectName.load_all_labels_split(style='color')
+MySpiderObjectName.find_eyes_points(style='color')
+MySpiderObjectName.compute_cephalothorax(style='color')
+```
+
+If you are using an image stack where ROIs are all in different stacks, are white and the baground is black (0s and 1s), use
+
+```python
+MySpiderObjectName.load_all_labels_split(style='binary')
+MySpiderObjectName.find_eyes_points(style='binary')
+MySpiderObjectName.find_cephalothorax_points(style='binary')
+```
+
+## Save and Reload
+Loading images is time consuming. If you want, you can at this stage save your data in pickle file. Next time you can start from the point data directly, using a lot less memory and taking less time
+```python
+GenusSpecies.save(filename='GenusSpecies')
+#GenusSpecies.save('GenusSpecies', type='h5') # Alternatively, specify the file extension. the default is .pickle
+```
+
+from now on, reload the data with
+```python
+GenusSpecies = Ct.Spider(workdir=path, voxelsize=0.001, paramspath=paramspath) 
+# REMEMBER! You always have to recreate the spider object for every new file.
+GenusSpecies.load(filename='GenusSpecies', type='pickle')
+```
+
+Note that saving only save dot clouds. For the projection data you will have to compute it every time.
+
+## Anatomy and orientation
+Now, we need to go from the provided ROIs to anatomically meaningful solids. Specifically we need to define:
+
+- The spider orientation relative to the CT scanner
+- The eyes and retina surfaces
+- The eyes focal point
+- Let's start with spider orientation
+
+### Orientation
+```python
+GenusSpecies.head_SoR(flipX=False, flipZ=False, plot=False)
+```
+
+This code takes the 7 body markers and create a new set of axis. This is:
+
+- centered on the center marker
+- with its x axis aligned with the back-front like, with positive xs going towards front
+- with its z axis perpendicular to x, parallel to the top-bottom axis with positive zs towards top
+- with its y axis perpendicular to x and z
+- Note that this function has a plot argument. This is used to check for errors in this reorientation step. Try:
+
+```python
+GenusSpecies.head_SoR(flipX=False, flipZ=False, plot=True)
+```
+
+If from the plot you notice some errors, you can fix it with the other two arguments. For example, if the Z axis points towards bottom rather than top, do:
+
+```python
+GenusSpecies.head_SoR(flipX=False, flipZ=True, plot=True)
+```
+Remember. This code saves the roto-translational matrix for the spider every time you run it. Be sure that your last run had the correct orientation.
+
+### Anatomy
+Now, let's use the point clouds to extract relevant information for eyes and retinas.
+
+```python
+GenusSpecies.compute_eyes()
+```
+
+The function has 2 facultative arguments, "focal_point_type" and "focal_point_position". These are used in finding the focal point of the lens, from which the retinal points will be projected in order to find the visual field.
+
+By default, focal_point_type='sphere'. This means that a sphere will be fit on the lens surface, and its center will be used as the focal point. It can happen that the lens is very flat, or maybe the point cloud is of bad quality. This can cause the sphere fitting algorithm to fail, and generate over or undersized sphere with centers behind the retina. You can notice this happening if when projecting the FOV they appear flipped or otherwise unrealistic (we will see this in the next step).
+
+If this happens, you can use focal_point_type='given'. In this case, the focal point will be defined as a point along the lens main axis, equidistant between the top surface of the lens and the bottom surface of the retina. You can manually shift this point more towards the lens or the retina by changing focal_point_position value. here, 0 = in contact with the retinal surface, 1 = in contact with the lens surface, 0.5 = midway between the two, all other values beween 0 and 1 = proportional positioning.
+
+Let's try with an example
+
+```python
+GenusSpecies.compute_eyes(focal_point_type='given', focal_point_position=0.75)
+```
+
+### Rotate
+Now that we have both the points and the rototranslational matrix, we can reorient all we have in order to have the spider as the center of our reference frame.
+
+```python
+GenusSpecies.from_std_to_head()
+```
+
+here you can again save your progress
+
+```python
+GenusSpecies.save(filename='GenusSpecies')
+```
+
+Remember to recreate the object and reload if you want to restart from here

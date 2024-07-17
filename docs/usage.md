@@ -2,9 +2,10 @@
 
 This readme will guide you through the use the software from data (images coming from a segmented CT) to fields (plots and raw data export)
 
-For a guide on how to install the software go to install.md, for how to prepare CT scans, go to data_preparation.md
+For a guide on how to install the software go to [install.md](https://github.com/massimodeagro/ctSpyderFields/blob/main/docs/install.md), for how to prepare CT scans, go to [data_preparation.md](https://github.com/massimodeagro/ctSpyderFields/blob/main/docs/data_preparation.md)
 
-An example script following this guide is available in the examples folder, as fullAnalysis.py. You will of course have to edit it to fit your use case.
+An example script following this guide is available in the examples folder, as [fullAnalysis.py](https://github.com/massimodeagro/ctSpyderFields/blob/main/examples/fullAnalysis.py). You will of course have to edit it to fit your use case.
+Moreover, this document is also available as a jupyter notebook in the example folder as [Full analysis of a CT data.ipynb](https://github.com/massimodeagro/ctSpyderFields/blob/main/examples/Full%20analysis%20of%20a%20CT%20data.ipynb).
 
 ## Load packages
 As a first step, let's load the library and other needed packages

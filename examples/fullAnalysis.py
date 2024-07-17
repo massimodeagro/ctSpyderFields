@@ -12,9 +12,12 @@ paramspath = '/home/massimodeagro/CTspyderFields/ctSpyderFields/examples/params.
 GenusSpecies = Ct.Spider(workdir=path, voxelsize=0.003, paramspath=paramspath)
 GenusSpecies.load(filename='PhilaeusChrysops', type='pickle')
 GenusSpecies.head_SoR(flipZ=True, plot=True)  # [4, 4] \in SE(3)
-
 GenusSpecies.compute_eyes(focal_point_type='given', focal_point_position=0.75)
 GenusSpecies.from_std_to_head()
+
+GenusSpecies.plot_matplotlib(elements=("lens", 'retina'), plot_FOV_sphere=False, field_mm=15)
+
+
 GenusSpecies.project_retinas_full(field_mm=150)
 GenusSpecies.find_all_fields_contours(stepsizes=[500, 1000, 300, 1000], tolerances=[500, 5000, 5000, 5000])
 GenusSpecies.sphericalCoordinates_compute(specific_discretization=15, general_discretization=36)

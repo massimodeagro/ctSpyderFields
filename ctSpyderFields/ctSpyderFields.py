@@ -1602,10 +1602,10 @@ class Spider:
         
         # Visualizing
         for axis in R:
-            ax.quiver(*origin, *axis, length=20000)
-        ax.text(20000, 0, 0, "x")
-        ax.text(0, 20000, 0, "y")
-        ax.text(0, 0, 20000, "z")
+            ax.quiver(*origin, *axis, length=int(field_mm / self.voxelSize))
+        ax.text(int(field_mm / self.voxelSize), 0, 0, "x")
+        ax.text(0, int(field_mm / self.voxelSize), 0, "y")
+        ax.text(0, 0, int(field_mm / self.voxelSize), "z")
 
         plt.show()
 

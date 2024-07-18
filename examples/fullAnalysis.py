@@ -15,7 +15,7 @@ GenusSpecies.head_SoR(flipZ=True, plot=True)  # [4, 4] \in SE(3)
 GenusSpecies.compute_eyes(focal_point_type='given', focal_point_position=0.75)
 GenusSpecies.from_std_to_head()
 
-GenusSpecies.plot_matplotlib(elements=("lens", 'retina'), plot_FOV_sphere=False, field_mm=15)
+GenusSpecies.plot_matplotlib(elements=("lens", 'retina'), plot_FOV_sphere=False, field_mm=5)
 
 
 GenusSpecies.project_retinas_full(field_mm=150)

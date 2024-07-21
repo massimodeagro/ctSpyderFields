@@ -144,3 +144,19 @@ GenusSpecies.save(filename='GenusSpecies')
 ```
 
 Remember to recreate the object and reload if you want to restart from here
+
+Let's take a moment to check our progress.
+
+```python
+GenusSpecies.plot_matplotlib(elements=("lens", "retina"), plot_FOV_sphere=False, field_mm=5)
+```
+
+the field_mm argument controls some things that will come in use later. For now, it is used to determine the length of X, Y, and Z axis on the plot. Specifically, the axis are (long field_mm/2)*voxelsize. We set plot_FOV_sphere as false as for now we have not created the field of views, so it would plot only an empty sphere.
+
+Use this plot to check how lens and retina look! As well as if the orientation is correct. Note that the plot does not show all of the points, but only the ones on the surface (i.e. the convex hull)
+
+If something doesn't look right, go back to the prevous steps!
+
+## Retinal projection
+
+Now, we can finally use the data we collected to project the retina surface through the lens focal point and therefore get the visual fields.

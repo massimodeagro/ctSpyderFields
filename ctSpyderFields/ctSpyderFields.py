@@ -1,6 +1,7 @@
 ### Image processing ###
 import cv2  # computer vision 2, reads images
 import trimesh  # to do 3d geometry
+import alphashape
 
 ### Tools ###
 from tqdm import tqdm  # to show percentage bars
@@ -516,59 +517,23 @@ class Eye:
                     if len(side) > 0:
                         tomerge.append(side)
         self.FOVcontourPoints = np.unique(np.concatenate(tomerge), axis=0)
-    
-    def calculate_span(self, visual_field_radius, voxel_size): #TODO obsolete
-        outlinePoints = self.FOVcontourPoints
 
-        transversePlanePoints = np.delete(outlinePoints, 2, 1)
-        transversePlaneDistances = np.sqrt(transversePlanePoints[:, 0] * transversePlanePoints[:, 0] +
-                                           transversePlanePoints[:, 1] * transversePlanePoints[:, 1])
-        transverseArgsPointsOnPlane = np.where(
-            np.logical_and(transversePlaneDistances >= (visual_field_radius / voxel_size) * 0.95,
-                           transversePlaneDistances <= (visual_field_radius / voxel_size) * 1))
-        transverseAngles = np.rad2deg(np.arctan(transversePlanePoints[:, 1] / transversePlanePoints[:, 0]))
-        transverseAnglesOnPlane = transverseAngles[transverseArgsPointsOnPlane]
-        if len(transverseAnglesOnPlane) > 0:
-            transverseSpan = [np.round(np.min(transverseAnglesOnPlane), 3),
-                              np.round(np.max(transverseAnglesOnPlane), 3)]
-            transverseArgSpan = [np.argmin(transverseAnglesOnPlane), np.argmax(transverseAnglesOnPlane)]
-        else:
-            transverseSpan = [None, None]
+    def find_field_contours_alphashape(self, alpha, voxelsize, field_mm=150):
+        #TODO: this works, but need to be integrated in the main loop.
 
-        coronalPlanePoints = np.delete(outlinePoints, 0, 1)
-        coronalPlaneDistances = np.sqrt(coronalPlanePoints[:, 0] * coronalPlanePoints[:, 0] +
-                                        coronalPlanePoints[:, 1] * coronalPlanePoints[:, 1])
-        coronalArgsPointsOnPlane = np.where(
-            np.logical_and(coronalPlaneDistances >= (visual_field_radius / voxel_size) * 0.95,
-                           coronalPlaneDistances <= (visual_field_radius / voxel_size) * 1.2))
-        coronalAngles = np.rad2deg(np.arctan(coronalPlanePoints[:, 1] / coronalPlanePoints[:, 0]))
-        coronalAnglesOnPlane = coronalAngles[coronalArgsPointsOnPlane]
-        if len(coronalAnglesOnPlane) > 0:
-            coronalSpan = [np.round(np.min(coronalAnglesOnPlane), 3),
-                           np.round(np.max(coronalAnglesOnPlane), 3)]
-            coronalArgSpan = [np.argmin(coronalAnglesOnPlane), np.argmax(coronalAnglesOnPlane)]
-        else:
-            coronalSpan = [None, None]
+        points = np.array((self.spherical_coordinates['spherical_points']['azimuth'],
+                           self.spherical_coordinates['spherical_points']['elevation'])).T
+        alpha_shape = alphashape.alphashape(points, alpha)
+        border_points = np.array(alpha_shape.exterior.coords)
 
-        sagittalPlanePoints = np.delete(outlinePoints, 1, 1)
-        sagittalPlaneDistances = np.sqrt(sagittalPlanePoints[:, 0] * sagittalPlanePoints[:, 0] +
-                                         sagittalPlanePoints[:, 1] * sagittalPlanePoints[:, 1])
-        sagittalArgsPointsOnPlane = np.where(
-            np.logical_and(sagittalPlaneDistances >= (visual_field_radius / voxel_size) * 0.95,
-                           sagittalPlaneDistances <= (visual_field_radius / voxel_size) * 1.2))
-        sagittalAngles = np.rad2deg(np.arctan(sagittalPlanePoints[:, 1] / sagittalPlanePoints[:, 0]))
-        sagittalAnglesOnPlane = sagittalAngles[sagittalArgsPointsOnPlane]
-        if len(sagittalAnglesOnPlane) > 0:
-            sagittalSpan = [np.round(np.min(sagittalAnglesOnPlane), 3),
-                            np.round(np.max(sagittalAnglesOnPlane), 3)]
-            sagittalArgSpan = [np.argmin(sagittalAnglesOnPlane), np.argmax(sagittalAnglesOnPlane)]
-        else:
-            sagittalSpan = [None, None]
+        field_vox = field_mm / voxelsize
+        coords = []
+        for dot in tqdm(border_points, desc=f'Calculating {self.EyeIdentity} FOV contour points'):
+            spherical_point = [field_vox, dot[0], dot[1]]
+            coords.append(self.spherical2cartesian(spherical_point))
 
-        #TODO add angle span from max e min to all three planes @Daniele
+        self.FOVcontourPoints = np.array(coords)
 
-        return {'Transverse': transverseSpan, 'Coronal': coronalSpan, 'Sagittal': sagittalSpan}
-    
     def cartesian2spherical(self, cartesian_point):
         """
             Input:
@@ -581,6 +546,18 @@ class Eye:
         phi = np.arctan2(cartesian_point[2], np.sqrt(cartesian_point[0]*cartesian_point[0] + cartesian_point[1]*cartesian_point[1]))
 
         return [rho, theta, phi]
+    def spherical2cartesian(self, spherical_point):
+        """
+            Input:
+            Spherical Point: [rho, theta (azimuth), phi (elevation)] (list)
+            Output:
+            Cartesian Point: [x, y, z] (list)
+        """
+        x = spherical_point[0] * np.cos(spherical_point[1]) * np.cos(spherical_point[2])
+        y = spherical_point[0] * np.cos(spherical_point[2]) * np.sin(spherical_point[1])
+        z = spherical_point[0] * np.sin(spherical_point[2])
+
+        return [x, y, z]
     
     def pairwise_angle_diff(self, angles):
         n_data = len(angles)
@@ -593,24 +570,34 @@ class Eye:
                                        angles[i], angles[j]])
         return np.array(pairwise_diff)
 
+    def calculate_spherical_coordinates(self, full=False):
+        spherical_points = []
+        if not full:
+            for point in tqdm(self.FOVcontourPoints):
+                spherical_points.append(self.cartesian2spherical(list(point)))
+        else:
+            for point in tqdm(np.array(self.StandardOrientationProjectedVectorsFull)[:, 2]):
+                spherical_points.append(self.cartesian2spherical(list(point)))
+
+        spherical_points = np.array(spherical_points)
+
+        self.spherical_coordinates['spherical_points'] = {'azimuth': spherical_points[:,1], 'elevation': spherical_points[:,2]}
+
     def calculate_span2(self, specific_discretization=15, general_discretization=72):
         """
             (i)     visual_field_radius: Radius of the Sphere;
             (ii)    voxel_size: how many points in mm.  
         """
-        # From Cartesian to Spherical
-        spherical_points = []
-        for point in self.FOVcontourPoints:
-            spherical_points.append(self.cartesian2spherical(list(point)))
 
-        spherical_points = np.array(spherical_points)
 
         # Sorting Points in terms of (i) azimuth and (ii) elevation
-        azimuth_points = copy.deepcopy(spherical_points[:, 1])
+        azimuth_points = copy.deepcopy(self.spherical_coordinates['spherical_points']['azimuth'])
         azimuth_points.sort()
+        az = copy.deepcopy(self.spherical_coordinates['spherical_points']['azimuth'])
 
-        elevation_points = copy.deepcopy(spherical_points[:, 2])
+        elevation_points = copy.deepcopy(self.spherical_coordinates['spherical_points']['elevation'])
         elevation_points.sort()
+        el = copy.deepcopy(self.spherical_coordinates['spherical_points']['elevation'])
 
         ### SPECIFIC DISCRETIZATION ###
 
@@ -621,7 +608,7 @@ class Eye:
 
         for r in np.array(azimuth_ranges).T:
             # Points in the current range
-            current_points = np.argwhere((spherical_points[:, 1] < r[1]) & (spherical_points[:, 1] >= r[0])).flatten()
+            current_points = np.argwhere((az < r[1]) & (az >= r[0])).flatten()
 
             elevation_max_spans['azimuth_range'].append(r)
 
@@ -630,7 +617,7 @@ class Eye:
                 elevation_max_spans['extremes'].append([np.nan, np.nan])
 
             else:
-                spans = self.pairwise_angle_diff(spherical_points[current_points, 2])
+                spans = self.pairwise_angle_diff(el[current_points])
                 this_spans = spans[np.argmax(spans[:,0])]
                 elevation_max_spans['span'].append(this_spans[0])
                 elevation_max_spans['extremes'].append(this_spans[1:])
@@ -642,7 +629,7 @@ class Eye:
 
         for r in np.array(elevation_ranges).T:
             # Points in the current range
-            current_points = np.argwhere((spherical_points[:, 2] < r[1]) & (spherical_points[:, 2] >= r[0])).flatten()
+            current_points = np.argwhere((el < r[1]) & (el >= r[0])).flatten()
 
             azimuth_max_spans['elevation_range'].append(r)
             if len(current_points) < 2:
@@ -650,12 +637,11 @@ class Eye:
                 azimuth_max_spans['extremes'].append([np.nan, np.nan])
 
             else:
-                spans = self.pairwise_angle_diff(spherical_points[current_points, 1])
+                spans = self.pairwise_angle_diff(az[current_points])
                 this_spans = spans[np.argmax(spans[:, 0])]
                 azimuth_max_spans['span'].append(this_spans[0])
                 azimuth_max_spans['extremes'].append(this_spans[1:])
 
-        self.spherical_coordinates['spherical_points'] = {'azimuth': spherical_points[:,1], 'elevation': spherical_points[:,2]}
         self.spherical_coordinates['azimuth_max_spans'] = {}
         self.spherical_coordinates['elevation_max_spans'] = {}
         self.spherical_coordinates['azimuth_max_spans']['specific_discretization'] = azimuth_max_spans
@@ -670,7 +656,7 @@ class Eye:
 
         for r in np.array(azimuth_ranges).T:
             # Points in the current range
-            current_points = np.argwhere((spherical_points[:, 1] < r[1]) & (spherical_points[:, 1] >= r[0])).flatten()
+            current_points = np.argwhere((az < r[1]) & (az >= r[0])).flatten()
 
             elevation_max_spans['azimuth_range'].append(r)
             if len(current_points) < 2:
@@ -678,7 +664,7 @@ class Eye:
                 elevation_max_spans['extremes'].append([np.nan, np.nan])
 
             else:
-                spans = self.pairwise_angle_diff(spherical_points[current_points, 2])
+                spans = self.pairwise_angle_diff(el[current_points])
                 this_spans = spans[np.argmax(spans[:, 0])]
                 elevation_max_spans['span'].append(this_spans[0])
                 elevation_max_spans['extremes'].append(this_spans[1:])
@@ -690,7 +676,7 @@ class Eye:
 
         for r in np.array(elevation_ranges).T:
             # Points in the current range
-            current_points = np.argwhere((spherical_points[:, 2] < r[1]) & (spherical_points[:, 2] >= r[0])).flatten()
+            current_points = np.argwhere((el < r[1]) & (el >= r[0])).flatten()
 
             azimuth_max_spans['elevation_range'].append(r)
             if len(current_points) < 2:
@@ -698,7 +684,7 @@ class Eye:
                 azimuth_max_spans['extremes'].append([np.nan, np.nan])
 
             else:
-                spans = self.pairwise_angle_diff(spherical_points[current_points, 1])
+                spans = self.pairwise_angle_diff(az[current_points])
                 this_spans = spans[np.argmax(spans[:, 0])]
                 azimuth_max_spans['span'].append(this_spans[0])
                 azimuth_max_spans['extremes'].append(this_spans[1:])
@@ -1070,7 +1056,20 @@ class Spider:
             self.eyes[list(self.available_eyes)[i]].find_field_contours(stepsizes[i], tolerances[i])
 
         print(" Done")        
-      
+
+    def find_all_fields_contours_alphashape(self, alphas=[90,90,90,90]):
+        """
+
+        :param stepsizes: the size of slices in each direction in pixels. Always need to be a 4 long list, even with less eyes
+        :param tolerances: the span from 0 from where to remove points found as contour, they probably are just plane edges
+        :return:
+        """
+        print("Finding fields of view contours...", end="")
+        for i in range(len(self.available_eyes)):
+            self.eyes[list(self.available_eyes)[i]].find_field_contours_alphashape(voxelsize=self.voxelSize, alpha=alphas[i])
+
+        print(" Done")
+
     def pure_geometrical(self, u, v):
         ### This value is obtained by:    ###
         # w \in null(A)                     #
@@ -1325,23 +1324,12 @@ class Spider:
 
         print(" Done")
 
-    def calculate_eyes_spans(
-            self,
-            field_radius,
-            eyes=("AME", "ALE", "PME", "PLE")
-    ): #TODO obsolete
-        spans = dict.fromkeys(eyes, None)
-
-        for eye in eyes:
-            spans[eye] = self.eyes[eye].calculate_span(visual_field_radius=field_radius,
-                                                       voxel_size=self.voxelSize)
-        return spans
-
-    def sphericalCoordinates_compute(self, eyes=("AME", "ALE", "PME", "PLE"), specific_discretization=15, general_discretization=72):
+    def sphericalCoordinates_compute(self, eyes=("AME", "ALE", "PME", "PLE"), specific_discretization=15, general_discretization=72, full=False):
 
         # Extract Information
         for eye in eyes:
             if eye in self.available_eyes:
+                self.eyes[eye].calculate_spherical_coordinates(full=full)
                 self.eyes[eye].calculate_span2(specific_discretization, general_discretization)
 
     def binocularOverlap_compute(self, eyes=("AME", "ALE", "PME", "PLE")):

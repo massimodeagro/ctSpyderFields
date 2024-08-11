@@ -155,8 +155,71 @@ the field_mm argument controls some things that will come in use later. For now,
 
 Use this plot to check how lens and retina look! As well as if the orientation is correct. Note that the plot does not show all of the points, but only the ones on the surface (i.e. the convex hull)
 
-If something doesn't look right, go back to the prevous steps!
+If something doesn't look right, go back to the previous steps!
 
 ## Retinal projection
 
 Now, we can finally use the data we collected to project the retina surface through the lens focal point and therefore get the visual fields.
+
+First, we project the retina towards the lens center, and hit a imaginary sphere around the spider
+
+```python
+GenusSpecies.project_retinas_full(field_mm=150)
+```
+
+150mm is the default. This doesn't really matter exclusion made for the sake of visualization
+
+You can now look at the projection with `GenusSpecies.plot_matplotlib(elements=("projection_full"))`, but we advise against. Plotting all of these points will bloat the processors and is anyway 
+not very useful. Instead, we will use the following function to extract the contours of the visual field, much more usable
+
+```python
+GenusSpecies.find_all_fields_contours_alphashape([90, 20, 20, 20])
+```
+
+The code works using [alpha shapes](https://en.wikipedia.org/wiki/Alpha_shape). The argument of the function is the provided alpha. If you go too small, the shape will follow the FOV only roughly. If you go too high, you will not get a single closed shape. Start with high numbers and try. If the system throws an error, change and retry.
+
+Now you can have a look!
+
+```python
+GenusSpecies.plot_matplotlib(elements=("FOVoutline"))
+GenusSpecies.sphericalCoordinates_plotFields() # This shows in spherical coordinates the full projection, not just contours.
+```
+
+If you want to compare the full projection with the developed contours, do:
+
+```python
+GenusSpecies.plot_matplotlib(elements=("projection_full", "FOVoutline"))
+```
+
+It may look a bit messy though. We suggest to keep on only the outline.
+
+Now that we have the FOV contour, we can calculate the spans for the final analysis.
+
+```python
+GenusSpecies.sphericalCoordinates_compute(specific_discretization=15, general_discretization=36)
+GenusSpecies.binocularOverlap_compute() # to calculate the binocular overlap, mirroring each eye and seeing if they have an overlap area
+GenusSpecies.multiEyeOverlap_compute() # to calculate pairwise eye overlap.
+```
+
+Now we can have a look at the results!
+
+```python
+GenusSpecies.sphericalCoordinates_plotFields()
+GenusSpecies.sphericalCoordinates_plotSorted()
+```
+
+These plots show the spherical coordinates.
+
+
+```python
+GenusSpecies.sphericalCoordinates_plotSpans(disc='general')
+GenusSpecies.sphericalCoordinates_plotSpans(disc='specific')
+```
+
+These instead show the calculated spans! The analysis is finished! If you want to extract the data for future use, you can do:
+
+```python
+GenusSpecies.sphericalCoordinates_save(filename='PhilaeusChrysops')
+```
+
+All the files are saved in the folder specified upon object creation (workdir). 

@@ -21,13 +21,13 @@ GenusSpecies.from_std_to_head()
 GenusSpecies.plot_matplotlib(elements=("lens", 'retina'), plot_FOV_sphere=False, field_mm=3)
 
 GenusSpecies.project_retinas_full(field_mm=150)
-# GenusSpecies.find_all_fields_contours(stepsizes=[500, 1000, 300, 1000], tolerances=[500, 5000, 5000, 5000])
 GenusSpecies.find_all_fields_contours_alphashape([90, 20, 20, 20])
 GenusSpecies.plot_matplotlib(elements=("FOVoutline"))
 GenusSpecies.sphericalCoordinates_plotFields()
 
-GenusSpecies.sphericalCoordinates_compute(specific_discretization=15, general_discretization=36, full=False)
+GenusSpecies.sphericalCoordinates_compute(specific_discretization=15, general_discretization=36)
 GenusSpecies.sphericalCoordinates_plotFields()
+
 
 GenusSpecies.binocularOverlap_compute()
 GenusSpecies.multiEyeOverlap_compute()
@@ -35,5 +35,4 @@ GenusSpecies.sphericalCoordinates_plotSorted()
 GenusSpecies.sphericalCoordinates_plotSpans(disc='general')
 GenusSpecies.sphericalCoordinates_plotSpans(disc='specific')
 
-GenusSpecies.plot_matplotlib(elements=("FOVoutline"))
 GenusSpecies.sphericalCoordinates_save(filename='PhilaeusChrysops')

@@ -29,6 +29,9 @@ class WrongCommand(Exception):
 class InvalidDataset(Exception):
     pass
 
+class AlphaShapeError(Exception):
+    pass
+
 ### Classes ###
 class Eye:
     """
@@ -519,21 +522,23 @@ class Eye:
         self.FOVcontourPoints = np.unique(np.concatenate(tomerge), axis=0)
 
     def find_field_contours_alphashape(self, alpha, voxelsize, field_mm=150):
-        #TODO: this works, but need to be integrated in the main loop.
 
-        points = np.array((self.spherical_coordinates['spherical_points']['azimuth'],
-                           self.spherical_coordinates['spherical_points']['elevation'])).T
-        alpha_shape = alphashape.alphashape(points, alpha)
-        border_points = np.array(alpha_shape.exterior.coords)
+        try:
+            points = np.array((self.spherical_coordinates['spherical_points']['azimuth'],
+                               self.spherical_coordinates['spherical_points']['elevation'])).T
+            alpha_shape = alphashape.alphashape(points, alpha)
+            border_points = np.array(alpha_shape.exterior.coords)
 
-        field_vox = field_mm / voxelsize
-        coords = []
-        for dot in tqdm(border_points, desc=f'Calculating {self.EyeIdentity} FOV contour points'):
-            spherical_point = [field_vox, dot[0], dot[1]]
-            coords.append(self.spherical2cartesian(spherical_point))
+            field_vox = field_mm / voxelsize
+            coords = []
+            print(f'Calculating {self.EyeIdentity} FOV contour points')
+            for dot in border_points:
+                spherical_point = [field_vox, dot[0], dot[1]]
+                coords.append(self.spherical2cartesian(spherical_point))
 
-        self.FOVcontourPoints = np.array(coords)
-
+            self.FOVcontourPoints = np.array(coords)
+        except AttributeError:
+            raise AlphaShapeError('could not generate a single contour. Try changing the alpha value for this eye')
     def cartesian2spherical(self, cartesian_point):
         """
             Input:
@@ -571,12 +576,13 @@ class Eye:
         return np.array(pairwise_diff)
 
     def calculate_spherical_coordinates(self, full=False):
+        print(f"Calculating {self.EyeIdentity} spherical coordinates...")
         spherical_points = []
         if not full:
             for point in tqdm(self.FOVcontourPoints):
                 spherical_points.append(self.cartesian2spherical(list(point)))
         else:
-            for point in tqdm(np.array(self.StandardOrientationProjectedVectorsFull)[:, 2]):
+            for point in np.array(self.StandardOrientationProjectedVectorsFull)[:, 2]:
                 spherical_points.append(self.cartesian2spherical(list(point)))
 
         spherical_points = np.array(spherical_points)
@@ -1064,11 +1070,13 @@ class Spider:
         :param tolerances: the span from 0 from where to remove points found as contour, they probably are just plane edges
         :return:
         """
-        print("Finding fields of view contours...", end="")
+        print("Finding fields of view contours. This will take time...")
+
         for i in range(len(self.available_eyes)):
+            self.eyes[list(self.available_eyes)[i]].calculate_spherical_coordinates(full=True)
             self.eyes[list(self.available_eyes)[i]].find_field_contours_alphashape(voxelsize=self.voxelSize, alpha=alphas[i])
 
-        print(" Done")
+        print("Done")
 
     def pure_geometrical(self, u, v):
         ### This value is obtained by:    ###

@@ -11,6 +11,7 @@ paramspath = '/home/massimodeagro/CTspyderFields/ctSpyderFields/examples/params.
 path = '/home/mad/Archive_NTFS/Drive/Experiments/Spider_ctSpyderFields/Data/PhilaeusChrysops/'
 paramspath = '/home/mad/PycharmProjects/ctSpyderFields/examples/params.yaml'
 
+
 # IF STARTING FROM PICKLE
 GenusSpecies = Ct.Spider(workdir=path, voxelsize=0.003, paramspath=paramspath)
 

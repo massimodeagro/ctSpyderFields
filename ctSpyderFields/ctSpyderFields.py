@@ -2,6 +2,7 @@
 import cv2  # computer vision 2, reads images
 import trimesh  # to do 3d geometry
 import alphashape
+from shapely.geometry import LineString, Point
 
 ### Tools ###
 from tqdm import tqdm  # to show percentage bars
@@ -87,6 +88,8 @@ class Eye:
 
         self.spherical_coordinates = {'overlaps': {},
                                       'spherical_points': {},
+                                      'alphashape_points': {},
+                                      'alphashape_object': {},
                                       'azimuth_max_spans': {},
                                       'elevation_max_spans': {}}
 
@@ -528,6 +531,8 @@ class Eye:
                                self.spherical_coordinates['spherical_points']['elevation'])).T
             alpha_shape = alphashape.alphashape(points, alpha)
             border_points = np.array(alpha_shape.exterior.coords)
+            self.spherical_coordinates['alphashape_points'] = border_points
+            self.spherical_coordinates['alphashape_object'] = alpha_shape
 
             field_vox = field_mm / voxelsize
             coords = []
@@ -616,6 +621,106 @@ class Eye:
         cluster_centers = [np.mean(cluster) for cluster in clusters]
         return len(clusters), cluster_centers
 
+
+    def calculate_span4(self, specific_discretization=15, general_discretization=72):
+        # Sorting Points in terms of (i) azimuth and (ii) elevation
+        azimuth_points = copy.deepcopy(self.spherical_coordinates['spherical_points']['azimuth'])
+        azimuth_points.sort()
+        az = copy.deepcopy(self.spherical_coordinates['spherical_points']['azimuth'])
+
+        elevation_points = copy.deepcopy(self.spherical_coordinates['spherical_points']['elevation'])
+        elevation_points.sort()
+        el = copy.deepcopy(self.spherical_coordinates['spherical_points']['elevation'])
+
+        self.spherical_coordinates['azimuth_max_spans'] = {}
+        self.spherical_coordinates['elevation_max_spans'] = {}
+
+        for disc in ['specific_discretization', 'general_discretization']:
+            for focus in ['azimuth', 'elevation']:
+                if focus == 'azimuth':
+                    # Azimuth range
+                    if disc == 'specific_discretization':
+                        azimuth_range = np.linspace(azimuth_points[0], azimuth_points[-1], specific_discretization)
+                    else:
+                        azimuth_range = np.linspace(np.deg2rad(-180), np.deg2rad(180), general_discretization)
+                    ranges = [azimuth_range[:-1], azimuth_range[1:]]
+                    elevation_max_spans = {'azimuth_range': [], 'span': [], 'extremes': []}
+                else:
+                    # Elevation range
+                    if disc == 'specific_discretization':
+                        elevation_range = np.linspace(elevation_points[0], elevation_points[-1], specific_discretization)
+                    else:
+                        elevation_range = np.linspace(np.deg2rad(-180), np.deg2rad(180), general_discretization)
+                    ranges = [elevation_range[:-1], elevation_range[1:]]
+                    azimuth_max_spans = {'elevation_range': [], 'span': [], 'extremes': []}
+
+                for r in np.array(ranges).T:
+                    center_angle = np.mean(r)
+                    if focus == 'azimuth':
+                        intersecter_line = LineString([(center_angle, -4), (center_angle, 4)])
+                    else:
+                        intersecter_line = LineString([(-4, center_angle), (4, center_angle)])
+                    intersect_points = self.spherical_coordinates['alphashape_object'].intersection(intersecter_line)
+                    if intersect_points.geom_type == 'LineString':
+                        intersect_points = np.array(list(intersect_points.xy))
+                    elif intersect_points.geom_type == 'MultiLineString':
+                        points = []
+                        for i in intersect_points.geoms:
+                            for n in i.coords:
+                                points.append(n)
+                        intersect_points = np.array(points)
+
+                    intersection_number = intersect_points.shape[0]
+                    if focus == 'azimuth':
+                        vals = intersect_points[:, 1]
+                    else:
+                        vals = intersect_points[:, 0]
+
+                    if intersection_number <= 1:
+                        if focus == 'azimuth':
+                            elevation_max_spans['span'].append(np.nan)
+                            elevation_max_spans['extremes'].append([np.nan, np.nan])
+                        else:
+                            azimuth_max_spans['span'].append(np.nan)
+                            azimuth_max_spans['extremes'].append([np.nan, np.nan])
+                    elif intersection_number == 2:
+                        pairwise_diff = []
+                        for i in range(len(vals)):
+                            for j in range(len(vals)):
+                                diff = vals[i] - vals[j]
+                                pairwise_diff.append([np.arctan2(np.sin(diff), np.cos(diff)),
+                                                      vals[i], vals[j]])
+                        spans = np.array(pairwise_diff)
+                        this_spans = spans[np.argmax(spans[:, 0])]
+                    elif intersection_number >= 3:
+                        total_span = 0
+                        for first, second in zip(np.sort(vals)[:-1], np.sort(vals)[1:]):
+                            #First, check if the FOV is between these two points or not
+                            center = (first + second) / 2
+                            if focus == 'azimuth':
+                                check = Point(center_angle, center)
+                            else:
+                                check = Point(center, center_angle)
+                            if self.spherical_coordinates['alphashape_object'].contains(check):
+                                #If the FOV is not between these two points, then we can calculate the span
+                                diff = second - first
+                                pairwise_diff = np.arctan2(np.sin(diff), np.cos(diff))
+                                total_span += pairwise_diff
+                        this_spans = [total_span, np.sort(vals)[0], np.sort(vals)[-1]]
+
+                    if focus == 'azimuth':
+                        elevation_max_spans['span'].append(this_spans[0])
+                        elevation_max_spans['extremes'].append(this_spans[1:])
+                    else:
+                        azimuth_max_spans['span'].append(this_spans[0])
+                        azimuth_max_spans['extremes'].append(this_spans[1:])
+
+                #TODO: this is throwing an error, saying azimuth is referenced before assignment. Weird. Check bug tomorrow
+
+                self.spherical_coordinates['azimuth_max_spans'][disc] = azimuth_max_spans
+                self.spherical_coordinates['elevation_max_spans'][disc] = elevation_max_spans
+
+
     def calculate_span3(self, specific_discretization=15, general_discretization=72):
         # Sorting Points in terms of (i) azimuth and (ii) elevation
         azimuth_points = copy.deepcopy(self.spherical_coordinates['spherical_points']['azimuth'])
@@ -626,290 +731,116 @@ class Eye:
         elevation_points.sort()
         el = copy.deepcopy(self.spherical_coordinates['spherical_points']['elevation'])
 
-        ### SPECIFIC DISCRETIZATION ###
-
-        # Azimuth range
-        azimuth_range = np.linspace(azimuth_points[0], azimuth_points[-1], specific_discretization)
-        azimuth_ranges = [azimuth_range[:-1], azimuth_range[1:]]
-        elevation_max_spans = {'azimuth_range': [], 'span': [], 'extremes': []}
-
-        for r in np.array(azimuth_ranges).T:
-            # Points in the current range
-            current_points = np.argwhere((az < r[1]) & (az >= r[0])).flatten()
-
-            elevation_max_spans['azimuth_range'].append(r)
-
-            if len(current_points) < 2:
-                elevation_max_spans['span'].append(np.nan)
-                elevation_max_spans['extremes'].append([np.nan, np.nan])
-
-            else:
-                elevation_selection = el[current_points]
-                clusters = self.identify_clusters(elevation_selection, gap_multiplier=15)
-
-                if clusters[0] == 1 or clusters[0] > 4:
-                    vals = (max(elevation_selection), min(elevation_selection))
-                    pairwise_diff = []
-                    for i in range(len(vals)):
-                        for j in range(len(vals)):
-                            diff = vals[i] - vals[j]
-                            pairwise_diff.append([np.arctan2(np.sin(diff), np.cos(diff)),
-                                                  vals[i], vals[j]])
-                    spans = np.array(pairwise_diff)
-                    this_spans = spans[np.argmax(spans[:, 0])]
-
-                elif clusters[0] == 2:
-                    vals = clusters[1]
-                    pairwise_diff = []
-                    for i in range(len(vals)):
-                        for j in range(len(vals)):
-                            diff = vals[i] - vals[j]
-                            pairwise_diff.append([np.arctan2(np.sin(diff), np.cos(diff)),
-                                                  vals[i], vals[j]])
-                    spans = np.array(pairwise_diff)
-                    this_spans = spans[np.argmax(spans[:, 0])]
-                elif clusters[0] == 3:
-                    vals = clusters[1]
-                    cluster_extremes = np.sort(vals)
-                    left = np.diff([cluster_extremes[0], cluster_extremes[1]])[0]
-                    right = np.diff([cluster_extremes[1], cluster_extremes[2]])[0]
-
-                    print(f'{self.EyeIdentity} - i got at azimuth range {r} and found 3 edges: {cluster_extremes}')
-                    choice = input(f'should I use the calculated left (l) span, right (r) span or both (b)?')
-                    if choice == 'l':
-                        this_spans = [left, cluster_extremes[0], cluster_extremes[1]]
-                    elif choice == 'r':
-                        this_spans = [right, cluster_extremes[1], cluster_extremes[2]]
-                    elif choice == 'b':
-                        total_span = np.sum([left, right])
-                        this_spans = [total_span, cluster_extremes[0], cluster_extremes[-1]]
-                elif clusters[0] == 4:
-                    vals = clusters[1]
-                    cluster_extremes = np.sort(vals)
-                    left = np.diff([cluster_extremes[0], cluster_extremes[1]])[0]
-                    right = np.diff([cluster_extremes[2], cluster_extremes[3]])[0]
-                    total_span = np.sum([left, right])
-                    this_spans = [total_span, cluster_extremes[0], cluster_extremes[-1]]
-                else:
-                    print(clusters[0])
-                    raise ValueError("Unexpected number of clusters.")
-
-                elevation_max_spans['span'].append(this_spans[0])
-                elevation_max_spans['extremes'].append(this_spans[1:])
-
-        # Elevation range
-        elevation_range = np.linspace(elevation_points[0], elevation_points[-1], specific_discretization)
-        elevation_ranges = [elevation_range[:-1], elevation_range[1:]]
-        azimuth_max_spans = {'elevation_range': [], 'span': [], 'extremes': []}
-
-        for r in np.array(elevation_ranges).T:
-            # Points in the current range
-            current_points = np.argwhere((el < r[1]) & (el >= r[0])).flatten()
-
-            azimuth_max_spans['elevation_range'].append(r)
-            if len(current_points) < 2:
-                azimuth_max_spans['span'].append(np.nan)
-                azimuth_max_spans['extremes'].append([np.nan, np.nan])
-            else:
-                azimuth_selection = az[current_points]
-                clusters = self.identify_clusters(azimuth_selection, gap_multiplier=15)
-
-                if clusters[0] == 1 or clusters[0] > 4:
-                    vals = (max(azimuth_selection), min(azimuth_selection))
-                    pairwise_diff = []
-                    for i in range(len(vals)):
-                        for j in range(len(vals)):
-                            diff = vals[i] - vals[j]
-                            pairwise_diff.append([np.arctan2(np.sin(diff), np.cos(diff)),
-                                                  vals[i], vals[j]])
-                    spans = np.array(pairwise_diff)
-                    this_spans = spans[np.argmax(spans[:, 0])]
-
-                elif clusters[0] == 2:
-                    vals = clusters[1]
-                    pairwise_diff = []
-                    for i in range(len(vals)):
-                        for j in range(len(vals)):
-                            diff = vals[i] - vals[j]
-                            pairwise_diff.append([np.arctan2(np.sin(diff), np.cos(diff)),
-                                                  vals[i], vals[j]])
-                    spans = np.array(pairwise_diff)
-                    this_spans = spans[np.argmax(spans[:, 0])]
-                elif clusters[0] == 3:
-                    vals = clusters[1]
-                    cluster_extremes = np.sort(vals)
-                    left = np.diff([cluster_extremes[0], cluster_extremes[1]])[0]
-                    right = np.diff([cluster_extremes[1], cluster_extremes[2]])[0]
-
-                    print(f'{self.EyeIdentity} - i got at elevation range {r} and found 3 edges: {cluster_extremes}')
-                    choice = input(f'should I use the calculated left (l) span, right (r) span or both (b)?')
-                    if choice == 'l':
-                        this_spans = [left, cluster_extremes[0], cluster_extremes[1]]
-                    elif choice == 'r':
-                        this_spans = [right, cluster_extremes[1], cluster_extremes[2]]
-                    elif choice == 'b':
-                        total_span = np.sum([left, right])
-                        this_spans = [total_span, cluster_extremes[0], cluster_extremes[-1]]
-                elif clusters[0] == 4:
-                    vals = clusters[1]
-                    cluster_extremes = np.sort(vals)
-                    left = np.diff([cluster_extremes[0], cluster_extremes[1]])[0]
-                    right = np.diff([cluster_extremes[2], cluster_extremes[3]])[0]
-                    total_span = np.sum([left, right])
-                    this_spans = [total_span, cluster_extremes[0], cluster_extremes[-1]]
-                else:
-                    print(clusters[0])
-                    raise ValueError("Unexpected number of clusters.")
-
-                azimuth_max_spans['span'].append(this_spans[0])
-                azimuth_max_spans['extremes'].append(this_spans[1:])
-
         self.spherical_coordinates['azimuth_max_spans'] = {}
         self.spherical_coordinates['elevation_max_spans'] = {}
-        self.spherical_coordinates['azimuth_max_spans']['specific_discretization'] = azimuth_max_spans
-        self.spherical_coordinates['elevation_max_spans']['specific_discretization'] = elevation_max_spans
 
-        ### General DISCRETIZATION ###
+        for disc in ['specific_discretization', 'general_discretization']:
 
-        # Azimuth range
-        azimuth_range = np.linspace(np.deg2rad(-180), np.deg2rad(180), general_discretization)
-        azimuth_ranges = [azimuth_range[:-1], azimuth_range[1:]]
-        elevation_max_spans = {'azimuth_range': [], 'span': [], 'extremes': []}
-
-
-        for r in np.array(azimuth_ranges).T:
-            # Points in the current range
-            current_points = np.argwhere((az < r[1]) & (az >= r[0])).flatten()
-
-            elevation_max_spans['azimuth_range'].append(r)
-
-            if len(current_points) < 2:
-                elevation_max_spans['span'].append(np.nan)
-                elevation_max_spans['extremes'].append([np.nan, np.nan])
-
-            else:
-                elevation_selection = el[current_points]
-                clusters = self.identify_clusters(elevation_selection, gap_multiplier=15)
-
-                if clusters[0] == 1 or clusters[0] > 4:
-                    vals = (max(elevation_selection), min(elevation_selection))
-                    pairwise_diff = []
-                    for i in range(len(vals)):
-                        for j in range(len(vals)):
-                            diff = vals[i] - vals[j]
-                            pairwise_diff.append([np.arctan2(np.sin(diff), np.cos(diff)),
-                                                  vals[i], vals[j]])
-                    spans = np.array(pairwise_diff)
-                    this_spans = spans[np.argmax(spans[:, 0])]
-
-                elif clusters[0] == 2:
-                    vals = clusters[1]
-                    pairwise_diff = []
-                    for i in range(len(vals)):
-                        for j in range(len(vals)):
-                            diff = vals[i] - vals[j]
-                            pairwise_diff.append([np.arctan2(np.sin(diff), np.cos(diff)),
-                                                  vals[i], vals[j]])
-                    spans = np.array(pairwise_diff)
-                    this_spans = spans[np.argmax(spans[:, 0])]
-                elif clusters[0] == 3:
-                    vals = clusters[1]
-                    cluster_extremes = np.sort(vals)
-                    left = np.diff([cluster_extremes[0], cluster_extremes[1]])[0]
-                    right = np.diff([cluster_extremes[1], cluster_extremes[2]])[0]
-
-                    print(f'{self.EyeIdentity} - i got at azimuth range {r} and found 3 edges: {cluster_extremes}')
-                    choice = input(f'should I use the calculated left (l) span, right (r) span or both (b)?')
-                    if choice == 'l':
-                        this_spans = [left, cluster_extremes[0], cluster_extremes[1]]
-                    elif choice == 'r':
-                        this_spans = [right, cluster_extremes[1], cluster_extremes[2]]
-                    elif choice == 'b':
-                        total_span = np.sum([left, right])
-                        this_spans = [total_span, cluster_extremes[0], cluster_extremes[-1]]
-                elif clusters[0] == 4:
-                    vals = clusters[1]
-                    cluster_extremes = np.sort(vals)
-                    left = np.diff([cluster_extremes[0], cluster_extremes[1]])[0]
-                    right = np.diff([cluster_extremes[2], cluster_extremes[3]])[0]
-                    total_span = np.sum([left, right])
-                    this_spans = [total_span, cluster_extremes[0], cluster_extremes[-1]]
+            for focus in ['azimuth', 'elevation']:
+                if focus == 'azimuth':
+                    # Azimuth range
+                    if disc == 'specific_discretization':
+                        azimuth_range = np.linspace(azimuth_points[0], azimuth_points[-1], specific_discretization)
+                    else:
+                        azimuth_range = np.linspace(np.deg2rad(-180), np.deg2rad(180), general_discretization)
+                    ranges = [azimuth_range[:-1], azimuth_range[1:]]
+                    elevation_max_spans = {'azimuth_range': [], 'span': [], 'extremes': []}
                 else:
-                    print(clusters[0])
-                    raise ValueError("Unexpected number of clusters.")
+                    # Elevation range
+                    if disc == 'specific_discretization':
+                        elevation_range = np.linspace(elevation_points[0], elevation_points[-1], specific_discretization)
+                    else:
+                        elevation_range = np.linspace(np.deg2rad(-180), np.deg2rad(180), general_discretization)
 
-                elevation_max_spans['span'].append(this_spans[0])
-                elevation_max_spans['extremes'].append(this_spans[1:])
+                    ranges = [elevation_range[:-1], elevation_range[1:]]
+                    azimuth_max_spans = {'elevation_range': [], 'span': [], 'extremes': []}
 
-        # Elevation range
-        elevation_range = np.linspace(np.deg2rad(-180), np.deg2rad(180), general_discretization)
-        elevation_ranges = [elevation_range[:-1], elevation_range[1:]]
-        azimuth_max_spans = {'elevation_range': [], 'span': [], 'extremes': []}
+                for r in np.array(ranges).T:
+                    # Points in the current range
+                    if focus == 'azimuth':
+                        current_points = np.argwhere((az < r[1]) & (az >= r[0])).flatten()
+                        elevation_max_spans['azimuth_range'].append(r)
+                    else:
+                        current_points = np.argwhere((el < r[1]) & (el >= r[0])).flatten()
+                        azimuth_max_spans['elevation_range'].append(r)
 
-        for r in np.array(elevation_ranges).T:
-            # Points in the current range
-            current_points = np.argwhere((el < r[1]) & (el >= r[0])).flatten()
+                    if len(current_points) < 2:
+                        if focus == 'azimuth':
+                            elevation_max_spans['span'].append(np.nan)
+                            elevation_max_spans['extremes'].append([np.nan, np.nan])
+                        else:
+                            azimuth_max_spans['span'].append(np.nan)
+                            azimuth_max_spans['extremes'].append([np.nan, np.nan])
+                    else:
+                        if focus == 'azimuth':
+                            selection = el[current_points]
+                        else:
+                            selection = az[current_points]
+                        clusters = [100,0]
+                        gap = 15
+                        while clusters[0] > 4:
+                            clusters = self.identify_clusters(selection, gap_multiplier=gap)
+                            gap += 1
+                            if clusters[0] > 10:
+                                pass
 
-            azimuth_max_spans['elevation_range'].append(r)
-            if len(current_points) < 2:
-                azimuth_max_spans['span'].append(np.nan)
-                azimuth_max_spans['extremes'].append([np.nan, np.nan])
-            else:
-                azimuth_selection = az[current_points]
-                clusters = self.identify_clusters(azimuth_selection, gap_multiplier=15)
+                        if clusters[0] == 1 or clusters[0] > 4:
+                            vals = (min(selection), max(selection))
+                            pairwise_diff = []
+                            for i in range(len(vals)):
+                                for j in range(len(vals)):
+                                    diff = vals[i] - vals[j]
+                                    pairwise_diff.append([np.arctan2(np.sin(diff), np.cos(diff)),
+                                                          vals[i], vals[j]])
+                            spans = np.array(pairwise_diff)
+                            this_spans = spans[np.argmax(spans[:, 0])]
 
-                if clusters[0] == 1 or clusters[0] > 4:
-                    vals = (max(azimuth_selection), min(azimuth_selection))
-                    pairwise_diff = []
-                    for i in range(len(vals)):
-                        for j in range(len(vals)):
-                            diff = vals[i] - vals[j]
-                            pairwise_diff.append([np.arctan2(np.sin(diff), np.cos(diff)),
-                                                  vals[i], vals[j]])
-                    spans = np.array(pairwise_diff)
-                    this_spans = spans[np.argmax(spans[:, 0])]
+                        elif clusters[0] == 2:
+                            vals = clusters[1]
+                            pairwise_diff = []
+                            for i in range(len(vals)):
+                                for j in range(len(vals)):
+                                    diff = vals[i] - vals[j]
+                                    pairwise_diff.append([np.arctan2(np.sin(diff), np.cos(diff)),
+                                                          vals[i], vals[j]])
+                            spans = np.array(pairwise_diff)
+                            this_spans = spans[np.argmax(spans[:, 0])]
+                        elif clusters[0] == 3:
+                            vals = clusters[1]
+                            cluster_extremes = np.sort(vals)
+                            left = np.diff([cluster_extremes[0], cluster_extremes[1]])[0]
+                            right = np.diff([cluster_extremes[1], cluster_extremes[2]])[0]
 
-                elif clusters[0] == 2:
-                    vals = clusters[1]
-                    pairwise_diff = []
-                    for i in range(len(vals)):
-                        for j in range(len(vals)):
-                            diff = vals[i] - vals[j]
-                            pairwise_diff.append([np.arctan2(np.sin(diff), np.cos(diff)),
-                                                  vals[i], vals[j]])
-                    spans = np.array(pairwise_diff)
-                    this_spans = spans[np.argmax(spans[:, 0])]
-                elif clusters[0] == 3:
-                    vals = clusters[1]
-                    cluster_extremes = np.sort(vals)
-                    left = np.diff([cluster_extremes[0], cluster_extremes[1]])[0]
-                    right = np.diff([cluster_extremes[1], cluster_extremes[2]])[0]
+                            print(f'{self.EyeIdentity} - i got at {focus} range {r} and found 3 edges: {cluster_extremes}')
+                            choice = input(f'should I use the calculated left (l) span, right (r) span or both (b)?')
+                            if choice == 'l':
+                                this_spans = [left, cluster_extremes[0], cluster_extremes[1]]
+                            elif choice == 'r':
+                                this_spans = [right, cluster_extremes[1], cluster_extremes[2]]
+                            elif choice == 'b':
+                                total_span = np.sum([left, right])
+                                this_spans = [total_span, cluster_extremes[0], cluster_extremes[-1]]
+                        elif clusters[0] == 4:
+                            vals = clusters[1]
+                            cluster_extremes = np.sort(vals)
+                            left = np.diff([cluster_extremes[0], cluster_extremes[1]])[0]
+                            right = np.diff([cluster_extremes[2], cluster_extremes[3]])[0]
+                            total_span = np.sum([left, right])
+                            this_spans = [total_span, cluster_extremes[0], cluster_extremes[-1]]
+                        else:
+                            print(clusters[0])
+                            raise ValueError("Unexpected number of clusters.")
 
-                    print(f'{self.EyeIdentity} - i got at elevation range {r} and found 3 edges: {cluster_extremes}')
-                    choice = input(f'should I use the calculated left (l) span, right (r) span or both (b)?')
-                    if choice == 'l':
-                        this_spans = [left, cluster_extremes[0], cluster_extremes[1]]
-                    elif choice == 'r':
-                        this_spans = [right, cluster_extremes[1], cluster_extremes[2]]
-                    elif choice == 'b':
-                        total_span = np.sum([left, right])
-                        this_spans = [total_span, cluster_extremes[0], cluster_extremes[-1]]
-                elif clusters[0] == 4:
-                    vals = clusters[1]
-                    cluster_extremes = np.sort(vals)
-                    left = np.diff([cluster_extremes[0], cluster_extremes[1]])[0]
-                    right = np.diff([cluster_extremes[2], cluster_extremes[3]])[0]
-                    total_span = np.sum([left, right])
-                    this_spans = [total_span, cluster_extremes[0], cluster_extremes[-1]]
-                else:
-                    print(clusters[0])
-                    raise ValueError("Unexpected number of clusters.")
+                        if focus == 'azimuth':
+                            elevation_max_spans['span'].append(this_spans[0])
+                            elevation_max_spans['extremes'].append(this_spans[1:])
+                        else:
+                            azimuth_max_spans['span'].append(this_spans[0])
+                            azimuth_max_spans['extremes'].append(this_spans[1:])
 
-                azimuth_max_spans['span'].append(this_spans[0])
-                azimuth_max_spans['extremes'].append(this_spans[1:])
+            self.spherical_coordinates['azimuth_max_spans'][disc] = azimuth_max_spans
+            self.spherical_coordinates['elevation_max_spans'][disc] = elevation_max_spans
 
-        self.spherical_coordinates['azimuth_max_spans']['general_discretization'] = azimuth_max_spans
-        self.spherical_coordinates['elevation_max_spans']['general_discretization'] = elevation_max_spans
     def calculate_span2(self, specific_discretization=15, general_discretization=72):
         """
             (i)     visual_field_radius: Radius of the Sphere;
@@ -1664,7 +1595,7 @@ class Spider:
                                            specific_discretization=15, general_discretization=72):
         for eye in eyes:
             if eye in self.available_eyes:
-                self.eyes[eye].calculate_span3(specific_discretization, general_discretization)
+                self.eyes[eye].calculate_span4(specific_discretization, general_discretization)
 
     def binocularOverlap_compute(self, eyes=("AME", "ALE", "PME", "PLE")):
         for eye in eyes:
@@ -1847,14 +1778,14 @@ class Spider:
         axs[0].set_ylabel('Elevation')
         axs[0].set_title("FOV elevation span per azimuth window")
         axs[0].set_xlim(-180, 180)
-        axs[0].set_ylim(0, 180)
+        axs[0].set_ylim(0, 360)
         axs[0].legend()
 
         axs[1].grid()
         axs[1].set_xlabel('Azimuth')
         axs[1].set_ylabel('Elevation Range')
         axs[1].set_title("FOV azimuth span per elevation window")
-        axs[1].set_xlim(0, 180)
+        axs[1].set_xlim(0, 360)
         axs[1].set_ylim(-180, 180)
         axs[1].legend()
         fig.show()

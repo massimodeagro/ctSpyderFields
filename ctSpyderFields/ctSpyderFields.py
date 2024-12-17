@@ -670,11 +670,7 @@ class Eye:
                                 points.append(n)
                         intersect_points = np.array(points)
 
-                    intersection_number = intersect_points.shape[0]
-                    if focus == 'azimuth':
-                        vals = intersect_points[:, 1]
-                    else:
-                        vals = intersect_points[:, 0]
+                    intersection_number = intersect_points.shape[1]
 
                     if intersection_number <= 1:
                         if focus == 'azimuth':
@@ -683,7 +679,12 @@ class Eye:
                         else:
                             azimuth_max_spans['span'].append(np.nan)
                             azimuth_max_spans['extremes'].append([np.nan, np.nan])
-                    elif intersection_number == 2:
+                    else:
+                        if focus == 'azimuth':
+                            vals = intersect_points[:, 1]
+                        else:
+                            vals = intersect_points[:, 0]
+                    if intersection_number == 2:
                         pairwise_diff = []
                         for i in range(len(vals)):
                             for j in range(len(vals)):
@@ -715,10 +716,8 @@ class Eye:
                         azimuth_max_spans['span'].append(this_spans[0])
                         azimuth_max_spans['extremes'].append(this_spans[1:])
 
-                #TODO: this is throwing an error, saying azimuth is referenced before assignment. Weird. Check bug tomorrow
-
-                self.spherical_coordinates['azimuth_max_spans'][disc] = azimuth_max_spans
-                self.spherical_coordinates['elevation_max_spans'][disc] = elevation_max_spans
+            self.spherical_coordinates['azimuth_max_spans'][disc] = azimuth_max_spans
+            self.spherical_coordinates['elevation_max_spans'][disc] = elevation_max_spans
 
 
     def calculate_span3(self, specific_discretization=15, general_discretization=72):

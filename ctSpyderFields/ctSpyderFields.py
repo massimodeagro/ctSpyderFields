@@ -2,7 +2,9 @@
 import cv2  # computer vision 2, reads images
 import trimesh  # to do 3d geometry
 import alphashape
-from shapely.geometry import LineString, Point
+from shapely.geometry import LineString, Point, Polygon
+from shapely.affinity import scale
+
 
 ### Tools ###
 from tqdm import tqdm  # to show percentage bars
@@ -89,7 +91,7 @@ class Eye:
         self.spherical_coordinates = {'overlaps': {},
                                       'spherical_points': {},
                                       'alphashape_points': {},
-                                      'alphashape_object': {},
+                                      'polygon': {},
                                       'azimuth_max_spans': {},
                                       'elevation_max_spans': {}}
 
@@ -532,7 +534,7 @@ class Eye:
             alpha_shape = alphashape.alphashape(points, alpha)
             border_points = np.array(alpha_shape.exterior.coords)
             self.spherical_coordinates['alphashape_points'] = border_points
-            self.spherical_coordinates['alphashape_object'] = alpha_shape
+            self.spherical_coordinates['polygon'] = alpha_shape
 
             field_vox = field_mm / voxelsize
             coords = []
@@ -658,9 +660,11 @@ class Eye:
                     center_angle = np.mean(r)
                     if focus == 'azimuth':
                         intersecter_line = LineString([(center_angle, -4), (center_angle, 4)])
+                        elevation_max_spans['azimuth_range'].append(r)
                     else:
                         intersecter_line = LineString([(-4, center_angle), (4, center_angle)])
-                    intersect_points = self.spherical_coordinates['alphashape_object'].intersection(intersecter_line)
+                        azimuth_max_spans['elevation_range'].append(r)
+                    intersect_points = self.spherical_coordinates['polygon'].intersection(intersecter_line)
                     if intersect_points.geom_type == 'LineString':
                         intersect_points = np.array(list(intersect_points.xy))
                     elif intersect_points.geom_type == 'MultiLineString':
@@ -702,19 +706,19 @@ class Eye:
                                 check = Point(center_angle, center)
                             else:
                                 check = Point(center, center_angle)
-                            if self.spherical_coordinates['alphashape_object'].contains(check):
+                            if self.spherical_coordinates['polygon'].contains(check):
                                 #If the FOV is not between these two points, then we can calculate the span
                                 diff = second - first
                                 pairwise_diff = np.arctan2(np.sin(diff), np.cos(diff))
                                 total_span += pairwise_diff
                         this_spans = [total_span, np.sort(vals)[0], np.sort(vals)[-1]]
-
-                    if focus == 'azimuth':
-                        elevation_max_spans['span'].append(this_spans[0])
-                        elevation_max_spans['extremes'].append(this_spans[1:])
-                    else:
-                        azimuth_max_spans['span'].append(this_spans[0])
-                        azimuth_max_spans['extremes'].append(this_spans[1:])
+                    if intersection_number > 1:
+                        if focus == 'azimuth':
+                            elevation_max_spans['span'].append(this_spans[0])
+                            elevation_max_spans['extremes'].append(this_spans[1:])
+                        else:
+                            azimuth_max_spans['span'].append(this_spans[0])
+                            azimuth_max_spans['extremes'].append(this_spans[1:])
 
             self.spherical_coordinates['azimuth_max_spans'][disc] = azimuth_max_spans
             self.spherical_coordinates['elevation_max_spans'][disc] = elevation_max_spans
@@ -950,7 +954,33 @@ class Eye:
         self.spherical_coordinates['elevation_max_spans']['general_discretization'] = elevation_max_spans
 
     def compute_arbitraryOverlap(self, comparator_identity, other_eye_data):
-        self.spherical_coordinates['overlaps'][comparator_identity] = {}
+        if comparator_identity not in self.spherical_coordinates['overlaps']:
+            self.spherical_coordinates['overlaps'][comparator_identity] = {}
+        overlap = self.spherical_coordinates['polygon'].intersection(other_eye_data['polygon'])
+        overlap_percentage = overlap.area / self.spherical_coordinates['polygon'].area
+        self.spherical_coordinates['overlaps'][comparator_identity]['overlap_percentage'] = overlap_percentage
+        self.spherical_coordinates['overlaps'][comparator_identity]['overlap_object'] = overlap
+
+    def compute_fullfieldOverlap(self, comparator_identity, other_eye_data):
+        if comparator_identity not in self.spherical_coordinates['overlaps']:
+            self.spherical_coordinates['overlaps'][comparator_identity] = {}
+        overlap = self.spherical_coordinates['polygon'].intersection(other_eye_data['polygon'])
+        overlap_percentage = overlap.area / other_eye_data['polygon'].area
+        self.spherical_coordinates['overlaps'][comparator_identity]['overlap_percentage'] = overlap_percentage
+        self.spherical_coordinates['overlaps'][comparator_identity]['overlap_object'] = overlap
+
+    def compute_binocularOverlap(self):
+        if 'binocular' not in self.spherical_coordinates['overlaps']:
+            self.spherical_coordinates['overlaps']['binocular'] = {}
+        other_eye = scale(self.spherical_coordinates['polygon'], xfact=-1, yfact=1, origin=(0,0))
+        overlap = self.spherical_coordinates['polygon'].intersection(other_eye)
+        overlap_percentage = overlap.area / self.spherical_coordinates['polygon'].area
+        self.spherical_coordinates['overlaps']['binocular']['overlap_percentage'] = overlap_percentage
+        self.spherical_coordinates['overlaps']['binocular']['overlap_object'] = overlap
+
+    def compute_arbitraryOverlap_spans(self, comparator_identity, other_eye_data):
+        if comparator_identity not in self.spherical_coordinates['overlaps']:
+            self.spherical_coordinates['overlaps'][comparator_identity] = {}
         self.spherical_coordinates['overlaps'][comparator_identity]['azimuth'] = \
             {'general_discretization': {'elevation_range': [], 'span': [], 'extremes': []}}
 
@@ -1008,7 +1038,7 @@ class Eye:
                 self.spherical_coordinates['overlaps'][comparator_identity]['elevation']['general_discretization'][
                     'span'].append(np.nan)
 
-    def compute_binocularOverlap(self, disc='specific'):
+    def compute_binocularOverlap_span(self, disc='specific'):
         if disc != 'specific' and disc != 'general':
             raise ValueError('non recognized discretization. check.')
         self.spherical_coordinates['overlaps']['binocular'] = {}
@@ -1596,11 +1626,24 @@ class Spider:
             if eye in self.available_eyes:
                 self.eyes[eye].calculate_span4(specific_discretization, general_discretization)
 
+    def binocularOverlap_spans_compute(self, eyes=("AME", "ALE", "PME", "PLE")):
+        for eye in eyes:
+            if eye in self.available_eyes:
+                self.eyes[eye].compute_binocularOverlap_span(disc='specific')
+                self.eyes[eye].compute_binocularOverlap_span(disc='general')
+
+    def multiEyeOverlap_spans_compute(self, eyes=("AME", "ALE", "PME", "PLE")):
+        for focus_eye in eyes:
+            for compare_eye in eyes:
+                if focus_eye != compare_eye:
+                    if focus_eye in self.available_eyes and compare_eye in self.available_eyes:
+                        compare_data = self.eyes[compare_eye].spherical_coordinates
+                        self.eyes[focus_eye].compute_arbitraryOverlap_spans(compare_eye, compare_data)
+
     def binocularOverlap_compute(self, eyes=("AME", "ALE", "PME", "PLE")):
         for eye in eyes:
             if eye in self.available_eyes:
-                self.eyes[eye].compute_binocularOverlap(disc='specific')
-                self.eyes[eye].compute_binocularOverlap(disc='general')
+                self.eyes[eye].compute_binocularOverlap()
 
     def multiEyeOverlap_compute(self, eyes=("AME", "ALE", "PME", "PLE")):
         for focus_eye in eyes:
@@ -1610,9 +1653,32 @@ class Spider:
                         compare_data = self.eyes[compare_eye].spherical_coordinates
                         self.eyes[focus_eye].compute_arbitraryOverlap(compare_eye, compare_data)
 
+    def fullSphereOverlap_compute(self, eyes=("AME", "ALE", "PME", "PLE")):
+        for eye in eyes:
+            if eye in self.available_eyes:
+                compare_data = {'polygon': Polygon([(-np.pi, np.pi/2), (np.pi, np.pi/2), (np.pi, -np.pi/2), (-np.pi, -np.pi/2)])}
+                self.eyes[eye].compute_fullfieldOverlap('FullField', compare_data)
+
+    def overlapsReport_save(self, filename, eyes=("AME", "ALE", "PME", "PLE")):
+
+        checks = ['AME', 'ALE', 'PME', 'PLE', 'binocular', 'FullField']
+        all_overlaps = {}
+        for eye in eyes:
+            if eye in self.available_eyes:
+                overlaps = []
+                for check in checks:
+                    if check in self.eyes[eye].spherical_coordinates['overlaps']:
+                        val = self.eyes[eye].spherical_coordinates['overlaps'][check]['overlap_percentage']
+                    else:
+                        val = np.nan
+                    overlaps.append(val)
+                all_overlaps[eye] = overlaps
+        all_overlaps = pd.DataFrame(all_overlaps, index=checks)
+        all_overlaps = all_overlaps.T
+        all_overlaps.to_csv(self.path + filename + 'overlapsReport.csv')
 
     def sphericalCoordinates_save(self, filename, eyes=("AME", "ALE", "PME", "PLE"),
-                                  disc=('specific', 'general'), overlap=('binocular', 'multieye')):
+                                  disc=('specific', 'general')):
         if 'general' in disc:
             eyeSummary_general_azimuth = {}
             eyeSummary_general_elevation = {}
@@ -1630,26 +1696,6 @@ class Spider:
                     eyeSummary_general_azimuth[eye+'_angle_span_max'] = np.array(data['extremes'])[:, 0]
                     eyeSummary_general_azimuth[eye+'_angle_span_min'] = np.array(data['extremes'])[:, 1]
 
-                    if 'binocular' in overlap:
-                        data = self.eyes[eye].spherical_coordinates['overlaps']['binocular']['azimuth'][
-                            'general_discretization']
-                        eyeSummary_general_azimuth[eye + '_binocularOverlap_span'] = np.array(data['span'])
-                        eyeSummary_general_azimuth[eye + '_binocularOverlap_angle_span_max'] = np.array(data['extremes'])[:, 0]
-                        eyeSummary_general_azimuth[eye + '_binocularOverlap_angle_span_min'] = np.array(data['extremes'])[:, 1]
-
-                    if 'multieye' in overlap:
-                        other_eyes = list(self.eyes[eye].spherical_coordinates['overlaps'].keys())
-                        if 'binocular' in other_eyes:
-                            other_eyes.remove('binocular')
-                        for other_eye in other_eyes:
-                            data = self.eyes[eye].spherical_coordinates['overlaps'][other_eye]['azimuth'][
-                                'general_discretization']
-                            eyeSummary_general_azimuth[eye + 'to' + other_eye + 'overlap_span'] = np.array(data['span'])
-                            eyeSummary_general_azimuth[eye + 'to' + other_eye + 'overlap_angle_span_max'] = np.array(
-                                data['extremes'])[:, 0]
-                            eyeSummary_general_azimuth[eye + 'to' + other_eye + 'overlap_angle_span_min'] = np.array(
-                                data['extremes'])[:, 1]
-
 
                     data = self.eyes[eye].spherical_coordinates['elevation_max_spans'][
                         'general_discretization']
@@ -1659,26 +1705,6 @@ class Spider:
                     eyeSummary_general_elevation[eye+'_span'] = np.array(data['span'])
                     eyeSummary_general_elevation[eye+'_angle_span_max'] = np.array(data['extremes'])[:, 0]
                     eyeSummary_general_elevation[eye+'_angle_span_min'] = np.array(data['extremes'])[:, 1]
-
-                    if 'binocular' in overlap:
-                        data = self.eyes[eye].spherical_coordinates['overlaps']['binocular']['elevation'][
-                            'general_discretization']
-                        eyeSummary_general_elevation[eye + '_binocularOverlap_span'] = np.array(data['span'])
-                        eyeSummary_general_elevation[eye + '_binocularOverlap_angle_span_max'] = np.array(data['extremes'])[:, 0]
-                        eyeSummary_general_elevation[eye + '_binocularOverlap_angle_span_min'] = np.array(data['extremes'])[:, 1]
-
-                    if 'multieye' in overlap:
-                        other_eyes = list(self.eyes[eye].spherical_coordinates['overlaps'].keys())
-                        if 'binocular' in other_eyes:
-                            other_eyes.remove('binocular')
-                        for other_eye in other_eyes:
-                            data = self.eyes[eye].spherical_coordinates['overlaps'][other_eye]['elevation'][
-                                'general_discretization']
-                            eyeSummary_general_elevation[eye + 'to' + other_eye + 'overlap_span'] = np.array(data['span'])
-                            eyeSummary_general_elevation[eye + 'to' + other_eye + 'overlap_angle_span_max'] = np.array(
-                                data['extremes'])[:, 0]
-                            eyeSummary_general_elevation[eye + 'to' + other_eye + 'overlap_angle_span_min'] = np.array(
-                                data['extremes'])[:, 1]
 
                 if 'specific' in disc:
                     for span_type in ['azimuth', 'elevation']:

@@ -685,9 +685,9 @@ class Eye:
                             azimuth_max_spans['extremes'].append([np.nan, np.nan])
                     else:
                         if focus == 'azimuth':
-                            vals = intersect_points[:, 1]
+                            vals = intersect_points[1]
                         else:
-                            vals = intersect_points[:, 0]
+                            vals = intersect_points[0]
                     if intersection_number == 2:
                         pairwise_diff = []
                         for i in range(len(vals)):

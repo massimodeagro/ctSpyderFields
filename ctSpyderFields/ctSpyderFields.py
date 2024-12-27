@@ -666,7 +666,7 @@ class Eye:
                         azimuth_max_spans['elevation_range'].append(r)
                     intersect_points = self.spherical_coordinates['polygon'].intersection(intersecter_line)
                     if intersect_points.geom_type == 'LineString':
-                        intersect_points = np.array(list(intersect_points.xy))
+                        intersect_points = np.array(list(intersect_points.xy)).T
                     elif intersect_points.geom_type == 'MultiLineString':
                         points = []
                         for i in intersect_points.geoms:
@@ -674,7 +674,7 @@ class Eye:
                                 points.append(n)
                         intersect_points = np.array(points)
 
-                    intersection_number = intersect_points.shape[1]
+                    intersection_number = intersect_points.shape[0]
 
                     if intersection_number <= 1:
                         if focus == 'azimuth':
@@ -685,15 +685,15 @@ class Eye:
                             azimuth_max_spans['extremes'].append([np.nan, np.nan])
                     else:
                         if focus == 'azimuth':
-                            vals = intersect_points[1]
+                            vals = intersect_points[:,1]
                         else:
-                            vals = intersect_points[0]
+                            vals = intersect_points[:,0]
                     if intersection_number == 2:
                         pairwise_diff = []
                         for i in range(len(vals)):
                             for j in range(len(vals)):
                                 diff = vals[i] - vals[j]
-                                pairwise_diff.append([np.arctan2(np.sin(diff), np.cos(diff)),
+                                pairwise_diff.append([diff,
                                                       vals[i], vals[j]])
                         spans = np.array(pairwise_diff)
                         this_spans = spans[np.argmax(spans[:, 0])]
@@ -709,8 +709,7 @@ class Eye:
                             if self.spherical_coordinates['polygon'].contains(check):
                                 #If the FOV is not between these two points, then we can calculate the span
                                 diff = second - first
-                                pairwise_diff = np.arctan2(np.sin(diff), np.cos(diff))
-                                total_span += pairwise_diff
+                                total_span += diff
                         this_spans = [total_span, np.sort(vals)[0], np.sort(vals)[-1]]
                     if intersection_number > 1:
                         if focus == 'azimuth':
@@ -1811,7 +1810,7 @@ class Spider:
         axs[1].set_ylabel('Elevation Range')
         axs[1].set_title("FOV azimuth span per elevation window")
         axs[1].set_xlim(0, 360)
-        axs[1].set_ylim(-180, 180)
+        axs[1].set_ylim(-90, 90)
         axs[1].legend()
         fig.show()
 

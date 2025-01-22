@@ -4,8 +4,7 @@ import trimesh  # to do 3d geometry
 import alphashape
 from shapely.geometry import LineString, Point, Polygon
 from shapely.affinity import scale
-from scipy.spatial import distance
-
+from scipy.spatial import distance, minkowski_distance
 
 ### Tools ###
 from tqdm import tqdm  # to show percentage bars
@@ -311,7 +310,7 @@ class Eye:
         split_plane, lens_spans, retinas_spans = self.find_split_plane()
         if focal_point_type == 'sphere':
             self.RotatedLensSphere = self.sphere_fit(self.RotatedLensSurfacePoints)
-        else:
+        elif focal_point_type=='given':
             if split_plane == 'x+':
                 lens_top, retina_bottom = max(lens_spans[0]), min(retinas_spans[0])
                 focal_x = retina_bottom + focal_point_position * (lens_top - retina_bottom)
@@ -347,10 +346,44 @@ class Eye:
                 focal_z = retina_bottom + focal_point_position * (lens_top - retina_bottom)
                 focal_x = np.mean(lens_spans[0])
                 focal_y = np.mean(lens_spans[1])
-
             radius = abs(lens_top - retina_bottom)
 
             self.RotatedLensSphere = radius, np.array([focal_x, focal_y, focal_z])
+
+        elif focal_point_type == 'retina_cup':
+            if split_plane == 'x+':
+                lens_top = np.array([max(lens_spans[0]), np.mean(lens_spans[1]), np.mean(lens_spans[2])])
+                retina_bottom = np.array([min(retinas_spans[0]), np.mean(lens_spans[1]), np.mean(lens_spans[2])])
+            elif split_plane == 'x-':
+                lens_top = np.array([min(lens_spans[0]), np.mean(lens_spans[1]), np.mean(lens_spans[2])])
+                retina_bottom = np.array([max(retinas_spans[0]), np.mean(lens_spans[1]), np.mean(lens_spans[2])])
+            elif split_plane == 'y+':
+                lens_top = np.array([np.mean(lens_spans[0]), max(lens_spans[1]), np.mean(lens_spans[2])])
+                retina_bottom = np.array([np.mean(lens_spans[0]), min(retinas_spans[1]), np.mean(lens_spans[2])])
+            elif split_plane == 'y-':
+                lens_top = np.array([np.mean(lens_spans[0]), min(lens_spans[1]), np.mean(lens_spans[2])])
+                retina_bottom = np.array([np.mean(lens_spans[0]), max(retinas_spans[1]), np.mean(lens_spans[2])])
+            elif split_plane == 'z+':
+                lens_top = np.array([np.mean(lens_spans[0]), np.mean(lens_spans[1]), max(lens_spans[2])])
+                retina_bottom = np.array([np.mean(lens_spans[0]), np.mean(lens_spans[1]), min(retinas_spans[2])])
+            elif split_plane == 'z-':
+                lens_top = np.array([np.mean(lens_spans[0]), np.mean(lens_spans[1]), min(lens_spans[2])])
+                retina_bottom = np.array([np.mean(lens_spans[0]), np.mean(lens_spans[1]), max(retinas_spans[2])])
+
+            alldists = []
+            distspans = []
+            for centerdist in tqdm(np.arange(0.1, 0.9, 0.05), f"finding best focal fit for {self.EyeIdentity}"):
+                center = retina_bottom + centerdist * (lens_top - retina_bottom)
+                distances = []
+                for pt in self.RotatedRetinaPoints:
+                    distances.append(distance.euclidean(pt, center))
+                alldists.append(distances)
+                distspans.append(max(distances)-min(distances))
+
+            bestfit = np.arange(0.1, 0.9, 0.05)[np.argmin(distspans)]
+            center = retina_bottom + bestfit * (lens_top - retina_bottom)
+            radius = abs(lens_top - retina_bottom)
+            self.RotatedLensSphere = radius, np.array(center)
 
     def get_lens_info(self):
         split_plane, lens_spans, retinas_spans = self.find_split_plane()
@@ -404,7 +437,7 @@ class Eye:
                                    'pointing_vector': lens_vector}
 
     def get_retina_info(self):
-
+        pass
 
     def rotate_back(self):
         """

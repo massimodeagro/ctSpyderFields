@@ -4,6 +4,7 @@ import trimesh  # to do 3d geometry
 import alphashape
 from shapely.geometry import LineString, Point, Polygon
 from shapely.affinity import scale
+from scipy.spatial import distance
 
 
 ### Tools ###
@@ -197,6 +198,8 @@ class Eye:
         This is needed for finding the cap of the lens.
         """
 
+        # TODO: use this function to extract info about the lenses
+
         # The cap of the lens is the part of the lens convex_hull that is the farthest
         # respect to the Retina
 
@@ -349,16 +352,84 @@ class Eye:
 
             self.RotatedLensSphere = radius, np.array([focal_x, focal_y, focal_z])
 
+    def get_lens_info(self):
+        split_plane, lens_spans, retinas_spans = self.find_split_plane()
+        if split_plane == 'x+':
+            lens_top = [max(lens_spans[0]), np.mean(lens_spans[1]), np.mean(lens_spans[2])]
+            lens_bottom = [min(lens_spans[0]), np.mean(lens_spans[1]), np.mean(lens_spans[2])]
+            lens_radius = np.mean([np.mean([abs(lens_spans[1][0]), abs(lens_spans[1][1])]),
+                                   np.mean([abs(lens_spans[2][0]), abs(lens_spans[2][1])])])
+            lens_vector = (1, 0, 0)
+
+        elif split_plane == 'x-':
+            lens_top = [min(lens_spans[0]), np.mean(lens_spans[1]), np.mean(lens_spans[2])]
+            lens_bottom = [max(lens_spans[0]), np.mean(lens_spans[1]), np.mean(lens_spans[2])]
+            lens_radius = np.mean([np.mean([abs(lens_spans[1][0]), abs(lens_spans[1][1])]),
+                                   np.mean([abs(lens_spans[2][0]), abs(lens_spans[2][1])])])
+            lens_vector = (-1, 0, 0)
+
+        elif split_plane == 'y+':
+            lens_top = [np.mean(lens_spans[0]), max(lens_spans[1]), np.mean(lens_spans[2])]
+            lens_bottom = [np.mean(lens_spans[0]), min(lens_spans[1]), np.mean(lens_spans[2])]
+            lens_radius = np.mean([np.mean([abs(lens_spans[0][0]), abs(lens_spans[0][1])]),
+                                   np.mean([abs(lens_spans[2][0]), abs(lens_spans[2][1])])])
+            lens_vector = (0, 1, 0)
+
+        elif split_plane == 'y-':
+            lens_top = [np.mean(lens_spans[0]), min(lens_spans[1]), np.mean(lens_spans[2])]
+            lens_bottom = [np.mean(lens_spans[0]), max(lens_spans[1]), np.mean(lens_spans[2])]
+            lens_radius = np.mean([np.mean([abs(lens_spans[0][0]), abs(lens_spans[0][1])]),
+                                   np.mean([abs(lens_spans[2][0]), abs(lens_spans[2][1])])])
+            lens_vector = (0, -1, 0)
+
+        elif split_plane == 'z+':
+            lens_top = [np.mean(lens_spans[0]), np.mean(lens_spans[1]), max(lens_spans[2])]
+            lens_bottom = [np.mean(lens_spans[0]), np.mean(lens_spans[1]), min(lens_spans[2])]
+            lens_radius = np.mean([np.mean([abs(lens_spans[1][0]), abs(lens_spans[1][1])]),
+                                   np.mean([abs(lens_spans[0][0]), abs(lens_spans[0][1])])])
+            lens_vector = (0, 0, 1)
+
+        elif split_plane == 'z-':
+            lens_top = [np.mean(lens_spans[0]), np.mean(lens_spans[1]), min(lens_spans[2])]
+            lens_bottom = [np.mean(lens_spans[0]), np.mean(lens_spans[1]), max(lens_spans[2])]
+            lens_radius = np.mean([np.mean([abs(lens_spans[1][0]), abs(lens_spans[1][1])]),
+                                   np.mean([abs(lens_spans[0][0]), abs(lens_spans[0][1])])])
+            lens_vector = (0, 0, -1)
+
+        lens_center = [np.mean(lens_spans[0]), np.mean(lens_spans[1]), np.mean(lens_spans[2])]
+
+        self.RotatedLensMarkers = {'top': lens_top, 'bottom':lens_bottom,
+                                   'length': distance.euclidean(lens_top, lens_bottom),
+                                   'center': lens_center, 'radius': lens_radius,
+                                   'pointing_vector': lens_vector}
+
+    def get_retina_info(self):
+
 
     def rotate_back(self):
         """
         rotate the sphere back to the original frame of reference
         """
 
+        #TODO if we add info exctraction, remember to rotate back here
+
         homMatrix = np.linalg.inv(
             self.LensCloud.convex_hull.principal_inertia_transform
         )
+        self.LensMarkers =  {'top': trimesh.transform_points([self.RotatedLensMarkers['top']], homMatrix)[0],
+                             'center': trimesh.transform_points([self.RotatedLensMarkers['center']], homMatrix)[0],
+                             'bottom': trimesh.transform_points([self.RotatedLensMarkers['bottom']], homMatrix)[0],
+                             'radius': self.RotatedLensMarkers['radius'],
+                             'length': self.RotatedLensMarkers['length'],
+                             'pointing_vector': None}
 
+        v = (self.LensMarkers['top'][0] - self.LensMarkers['center'][0],
+             self.LensMarkers['top'][1] - self.LensMarkers['center'][1],
+             self.LensMarkers['top'][2] - self.LensMarkers['center'][2])
+        vmag = np.sqrt(v[0] ** 2 + v[1] ** 2 + v[2] ** 2)
+        vu = (v[0] / vmag, v[1] / vmag, v[2] / vmag)
+
+        self.LensMarkers['pointing_vector'] = vu
         self.LensSphere = (
             self.RotatedLensSphere[0],
             trimesh.transform_points([self.RotatedLensSphere[1]], homMatrix)[0],
@@ -369,6 +440,22 @@ class Eye:
         # Lens
         self.StandardOrientationLensPoints = trimesh.transform_points(self.LensPoints, hom_matrix)
         self.StandardOrientationLensCloud = trimesh.points.PointCloud(self.StandardOrientationLensPoints)
+
+        self.StandardOrientationLensMarkers = {'top': trimesh.transform_points([self.LensMarkers['top']], hom_matrix)[0],
+                                               'center': trimesh.transform_points([self.LensMarkers['center']], hom_matrix)[0],
+                                               'bottom': trimesh.transform_points([self.LensMarkers['bottom']], hom_matrix)[0],
+                                               'radius': self.LensMarkers['radius'],
+                                               'length': self.LensMarkers['length'],
+                                               'pointing_vector': None}
+
+        v = (self.StandardOrientationLensMarkers['top'][0] - self.StandardOrientationLensMarkers['center'][0],
+             self.StandardOrientationLensMarkers['top'][1] - self.StandardOrientationLensMarkers['center'][1],
+             self.StandardOrientationLensMarkers['top'][2] - self.StandardOrientationLensMarkers['center'][2])
+        vmag = np.sqrt(v[0] ** 2 + v[1] ** 2 + v[2] ** 2)
+        vu = (v[0] / vmag, v[1] / vmag, v[2] / vmag)
+
+        self.StandardOrientationLensMarkers['pointing_vector'] = vu
+
         # Retina
         self.StandardOrientationRetinaPoints = trimesh.transform_points(self.RetinaPoints, hom_matrix)
         self.StandardOrientationRetinaCloud = trimesh.points.PointCloud(self.StandardOrientationRetinaPoints)
@@ -884,6 +971,7 @@ class Spider:
             self.eyes[eye].define_all_clouds()
             self.eyes[eye].align_to_zero()
             self.eyes[eye].find_lens_sphere(focal_point_type, focal_point_position)
+            self.eyes[eye].get_lens_info()
             self.eyes[eye].rotate_back()
         else:
             raise(UnrecognizedEye("Unrecognized Eye: Computation aborted."))
@@ -893,8 +981,11 @@ class Spider:
         run this! compute all eyes together
         """
         print('Computing lenses and retina geometries...', end='')
-        for eye in self.available_eyes:
-            self.compute_eye(eye, focal_point_type, focal_point_position)
+        for n, eye in enumerate(self.available_eyes):
+            if focal_point_type == 'given_different':
+                self.compute_eye(eye, focal_point_type, focal_point_position[n])
+            else:
+                self.compute_eye(eye, focal_point_type, focal_point_position)
         print(' Done')
 
     def find_cephalothorax_points(self, style='binary'):
@@ -980,7 +1071,7 @@ class Spider:
         print("Finding fields of view contours. This will take time...")
 
         for i in range(len(self.available_eyes)):
-            self.eyes[list(self.available_eyes)[i]].calculate_spherical_coordinates(full=True)
+            #self.eyes[list(self.available_eyes)[i]].calculate_spherical_coordinates(full=True) #TODO change documentation to explain that you need to call them separately
             self.eyes[list(self.available_eyes)[i]].find_field_contours_alphashape(voxelsize=self.voxelSize, alpha=alphas[i])
 
         print("Done")
@@ -1346,12 +1437,18 @@ class Spider:
         axs[1].legend()
         fig.show()
 
-    def sphericalCoordinates_plotFields(self, eyes=("AME", "ALE", "PME", "PLE"), ret=False):
+    def sphericalCoordinates_plotFields(self, eyes=("AME", "ALE", "PME", "PLE"), binocular=True, ret=False):
         fig, ax = plt.subplots()
+        from shapely.affinity import scale
         for eye in eyes:
-            ax.plot(self.eyes[eye].spherical_coordinates['spherical_points']['azimuth'],
-                    self.eyes[eye].spherical_coordinates['spherical_points']['elevation'],
-                    'o', label=eye, markersize=3, color=self.toplot_colors[eye])
+            ax.fill(self.eyes[eye].spherical_coordinates['polygon'].exterior.xy[0],
+                    self.eyes[eye].spherical_coordinates['polygon'].exterior.xy[1],
+                    label=eye, color=self.toplot_colors[eye], alpha=0.5)
+            if binocular:
+                reverse = scale(self.eyes[eye].spherical_coordinates['polygon'], xfact=-1, yfact=1, origin=(0,0))
+                ax.fill(reverse.exterior.xy[0],
+                        reverse.exterior.xy[1],
+                        label=eye, color=self.toplot_colors[eye], alpha=0.5)
 
         # # Azimuth vs Elevation plots
         ax.grid()
@@ -1360,6 +1457,7 @@ class Spider:
         ax.set_title("Elevation vs Azimuth")
         ax.set_xlim(-np.pi, np.pi)
         ax.legend()
+        ax.set_aspect('equal')
         fig.show()
 
     def sphericalCoordinates_plotSpans(self, eyes=("AME", "ALE", "PME", "PLE"), ret=False):

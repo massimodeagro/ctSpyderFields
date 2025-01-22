@@ -197,8 +197,6 @@ class Eye:
         This is needed for finding the cap of the lens.
         """
 
-        # TODO: use this function to extract info about the lenses
-
         # The cap of the lens is the part of the lens convex_hull that is the farthest
         # respect to the Retina
 
@@ -1104,7 +1102,7 @@ class Spider:
         print("Finding fields of view contours. This will take time...")
 
         for i in range(len(self.available_eyes)):
-            #self.eyes[list(self.available_eyes)[i]].calculate_spherical_coordinates(full=True) #TODO change documentation to explain that you need to call them separately
+            self.eyes[list(self.available_eyes)[i]].calculate_spherical_coordinates(full=True)
             self.eyes[list(self.available_eyes)[i]].find_field_contours_alphashape(voxelsize=self.voxelSize, alpha=alphas[i])
 
         print("Done")

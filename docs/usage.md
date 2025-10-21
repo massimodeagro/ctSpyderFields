@@ -103,11 +103,16 @@ This code takes the 7 body markers and create a new set of axis. This is:
 MySpiderObjectName.head_SoR(flipX=False, flipZ=False, plot=True)
 ```
 
+![SOR plot](images/SORplot.png)
+
 If from the plot you notice some errors, you can fix it with the other two arguments. For example, if the Z axis points towards bottom rather than top, do:
 
 ```python
 MySpiderObjectName.head_SoR(flipX=False, flipZ=True, plot=True)
 ```
+
+![SOR plot](images/SORplotFix.png)
+
 Remember. This code saves the roto-translational matrix for the spider every time you run it. Be sure that your last run had the correct orientation.
 
 ### Anatomy
@@ -183,21 +188,18 @@ Now you can have a look!
 
 ```python
 MySpiderObjectName.plot_matplotlib(elements=("FOVoutline"))
-MySpiderObjectName.sphericalCoordinates_plotFields() # This shows in spherical coordinates the full projection, not just contours.
 ```
+![FOV contours](images/FOVcontours.png)
 
-If you want to compare the full projection with the developed contours, do:
-
-```python
-MySpiderObjectName.plot_matplotlib(elements=("projection_full", "FOVoutline"))
-```
-
-It may look a bit messy though. We suggest to keep on only the outline.
+If you want to compare the full projection with the developed contours, 
+do `MySpiderObjectName.plot_matplotlib(elements=("projection_full", "FOVoutline"))` It may look a bit messy though. 
+We suggest to keep on only the outline.
 
 Now that we have the FOV contour, we can calculate the spans for the final analysis.
 
 ```python
-MySpiderObjectName.sphericalCoordinates_compute(specific_discretization=15, general_discretization=36)
+MySpiderObjectName.sphericalCoordinates_compute() #this has the optional argument "full", to plot all points rather than just contours. Default is False
+MySpiderObjectName.sphericalCoordinates_calculateSpan() #this calculates the angular spans for each eye. it requires discretization. argument is "spans", default is 72
 MySpiderObjectName.binocularOverlap_compute() # to calculate the binocular overlap, mirroring each eye and seeing if they have an overlap area
 MySpiderObjectName.multiEyeOverlap_compute() # to calculate pairwise eye overlap.
 ```
@@ -206,16 +208,23 @@ Now we can have a look at the results!
 
 ```python
 MySpiderObjectName.sphericalCoordinates_plotFields()
+```
+![Flat Fields](images/FlatFields.png)
+
+```python
 MySpiderObjectName.sphericalCoordinates_plotSorted()
 ```
+![Sorted Fields](images/sortedFields.png)
 
 These plots show the spherical coordinates.
 
 
 ```python
-MySpiderObjectName.sphericalCoordinates_plotSpans(disc='general')
-MySpiderObjectName.sphericalCoordinates_plotSpans(disc='specific')
+MySpiderObjectName.sphericalCoordinates_plotSpans()
 ```
+
+![Spans](images/spans.png)
+
 
 These instead show the calculated spans! The analysis is finished! If you want to extract the data for future use, you can do:
 
@@ -224,3 +233,42 @@ MySpiderObjectName.sphericalCoordinates_save(filename='PhilaeusChrysops')
 ```
 
 All the files are saved in the folder specified upon object creation (workdir). 
+
+
+## Custom plotting
+
+remember that you can always extract the data from the Spider object to make custom plots, without having to use the
+pre-packaged functions. See here an example using plotly that shows both sides by mirroring the data
+
+```python
+import plotly.graph_objects as go
+
+#first, draw a sphere
+u, v = np.mgrid[0:2 * np.pi:50j, 0:np.pi:50j]
+
+x = 150/0.003 * np.cos(u) * np.sin(v)
+y = 150/0.003 * np.sin(u) * np.sin(v)
+z = 150/0.003 * np.cos(v)
+
+sphere = go.Surface(x=x, y=y, z=z, opacity=0.7,colorscale=[[0, 'white'], [1,'white']],
+             showscale=False)
+
+data = []
+data.append(sphere)
+for eye, color in zip(['AME', 'ALE', 'PME', 'PLE'], ['purple', 'green', 'goldenrod', 'darkred']): #for all eyes
+    Outline = MySpiderObjectName.eyes[eye].FOVcontourPoints #extract points
+    data.append(
+        go.Scatter3d(x=Outline[:,0], y=Outline[:,1], z=Outline[:,2],
+                         mode='markers', marker={'color': color, 'size': 3}) #plot straight
+    )
+    data.append(
+        go.Scatter3d(x=Outline[:,0], y=np.multiply(Outline[:,1], -1), z=Outline[:,2],
+                        mode='markers', marker={'color': color, 'size': 3}) #plot reversed
+    )
+
+fig = go.Figure(data=data)
+fig.show()
+```
+
+![plotly](images/plotlyexample.png)
+

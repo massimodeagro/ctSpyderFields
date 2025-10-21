@@ -4,8 +4,7 @@ This readme will guide you through the use the software from data (images coming
 
 For a guide on how to install the software go to [README.md](https://github.com/massimodeagro/ctSpyderFields/blob/main/README.md), for how to prepare CT scans, go to [data_preparation.md](https://github.com/massimodeagro/ctSpyderFields/blob/main/docs/data_preparation.md)
 
-An example script following this guide is available in the examples folder, as [fullAnalysis.py](https://github.com/massimodeagro/ctSpyderFields/blob/main/examples/fullAnalysis.py). You will of course have to edit it to fit your use case.
-Moreover, this document is also available as a jupyter notebook in the example folder as [Full analysis of a CT data.ipynb](https://github.com/massimodeagro/ctSpyderFields/blob/main/examples/Full%20analysis%20of%20a%20CT%20data.ipynb).
+We suggest using the package in interactive mode, looking at the output of every function and plotting on the go. A good way to do so is to use Jupyter notebooks. 
 
 ## Load packages
 As a first step, let's load the library and other needed packages
@@ -22,7 +21,7 @@ Now, let's provide some definitions. These are specific to your machine and data
 path = '/path/to/foder/where/image/data/is/located/' #remember the final "/"
 paramspath = 'path/to/where/parameters/for/images/is/located/params.yaml'
 ```
-
+path points to where your tiff-stack is located. Check  [data_preparation.md](https://github.com/massimodeagro/ctSpyderFields/blob/main/docs/data_preparation.md) for more instructions
 params.yaml contains the color definition for importing points from image stack from AMIRA/DRAGONFLY. This is needed if the image stack presents different ROIs with different colors. Provide in the yaml the RGB value for each ROIs, giving a minimum and a maximum value (images may not be precise and especially around the edges may blur slightly with the background). An example params.yaml is provided for the structure
 
 ```python

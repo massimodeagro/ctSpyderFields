@@ -1,1 +1,1 @@
-from .ctSpyderFields import Spider
+from .ctSpyderFields import Spider, __version__

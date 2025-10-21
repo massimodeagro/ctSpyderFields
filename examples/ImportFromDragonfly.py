@@ -2,9 +2,7 @@
 Example script to compute a spider segmented with dragonfly. Make sure to have one folder with all the pngs for all the
 slices, containing segmented lens and retina for each eye, plus the 7 cephalothorax markers. Always pass a param, even if empty
 """
-from ctSpyderFields import ctSpyderFields
-import numpy as np
-
+from src.ctSpyderFields import ctSpyderFields
 
 path = '/path/to/images/'
 paramspath = '/path/to/params/params.yaml'

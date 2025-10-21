@@ -4,4 +4,3 @@ Python package that project retinas through lenses as segmented from micro CT sc
 guides are available in the [docs](https://github.com/massimodeagro/ctSpyderFields/blob/main/docs) folder.
 
 Tested with Python=3.10
-```

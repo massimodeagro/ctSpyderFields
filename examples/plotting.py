@@ -1,4 +1,4 @@
-from ctSpyderFields import ctSpyderFields
+from src.ctSpyderFields import ctSpyderFields
 import numpy as np
 
 

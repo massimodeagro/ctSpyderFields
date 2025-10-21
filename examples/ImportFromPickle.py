@@ -1,6 +1,5 @@
 
-from ctSpyderFields import ctSpyderFields
-import numpy as np
+from src.ctSpyderFields import ctSpyderFields
 
 path = 'C:/Users/lauren.sumner-rooney/Documents/DragonflyProjects/DragonflyExport/VisualFieldFinder/Philaeus-chrysops/'
 

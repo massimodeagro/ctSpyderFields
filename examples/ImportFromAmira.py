@@ -2,9 +2,7 @@
 Example script to compute a spider segmented with amira. Make sure to have one folder with all the pngs for all the
 slices, containing segmented lens and retina for each eye, plus the 7 cephalothorax markers. remember to pass the
 """
-from ctSpyderFields import ctSpyderFields
-import numpy as np
-
+from src.ctSpyderFields import ctSpyderFields
 
 path = '/home/massimodeagro/CTspyderFields/ctSpyderFields/Data/PirataPiratacus/'
 paramspath = '/home/massimodeagro/CTspyderFields/ctSpyderFields/examples/params.yaml'

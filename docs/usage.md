@@ -11,7 +11,7 @@ Moreover, this document is also available as a jupyter notebook in the example f
 As a first step, let's load the library and other needed packages
 
 ```python
-from ctSpyderFields import ctSpyderFields
+from src.ctSpyderFields import ctSpyderFields
 import numpy as np
 ```
 

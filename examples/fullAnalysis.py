@@ -2,8 +2,7 @@
 Example script to compute a spider starting from saved pickle.
 """
 # Sys to add the path
-import ctSpyderFields.ctSpyderFields as Ct
-import numpy as np
+from src import ctSpyderFields as Ct
 
 path = '/home/massimodeagro/CTspyderFields/ctSpyderFields/Data/PhilaeusChrysops/'
 paramspath = '/home/massimodeagro/CTspyderFields/ctSpyderFields/examples/params.yaml'

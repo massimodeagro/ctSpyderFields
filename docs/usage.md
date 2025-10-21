@@ -2,7 +2,7 @@
 
 This readme will guide you through the use the software from data (images coming from a segmented CT) to fields (plots and raw data export)
 
-For a guide on how to install the software go to [install.md](https://github.com/massimodeagro/ctSpyderFields/blob/main/docs/install.md), for how to prepare CT scans, go to [data_preparation.md](https://github.com/massimodeagro/ctSpyderFields/blob/main/docs/data_preparation.md)
+For a guide on how to install the software go to [README.md](https://github.com/massimodeagro/ctSpyderFields/blob/main/README.md), for how to prepare CT scans, go to [data_preparation.md](https://github.com/massimodeagro/ctSpyderFields/blob/main/docs/data_preparation.md)
 
 An example script following this guide is available in the examples folder, as [fullAnalysis.py](https://github.com/massimodeagro/ctSpyderFields/blob/main/examples/fullAnalysis.py). You will of course have to edit it to fit your use case.
 Moreover, this document is also available as a jupyter notebook in the example folder as [Full analysis of a CT data.ipynb](https://github.com/massimodeagro/ctSpyderFields/blob/main/examples/Full%20analysis%20of%20a%20CT%20data.ipynb).
@@ -11,7 +11,7 @@ Moreover, this document is also available as a jupyter notebook in the example f
 As a first step, let's load the library and other needed packages
 
 ```python
-from src.ctSpyderFields import ctSpyderFields
+import ctSpyderFields as Ct
 import numpy as np
 ```
 
@@ -41,7 +41,7 @@ labelnames dictionary provides the name of the image stack associated with each 
 First, we create the object
 
 ```python
-MySpiderObjectName = ctSpyderFields.Spider(workdir=path, label_names=labelnames, voxelsize=0.001, paramspath=paramspath) 
+MySpiderObjectName = Ct.Spider(workdir=path, label_names=labelnames, voxelsize=0.001, paramspath=paramspath) 
 # remember to set voxelsize as given by your CT analysis software
 ```
 
@@ -66,15 +66,15 @@ MySpiderObjectName.find_cephalothorax_points(style='binary')
 ## Save and Reload
 Loading images is time consuming. If you want, you can at this stage save your data in pickle file. Next time you can start from the point data directly, using a lot less memory and taking less time
 ```python
-GenusSpecies.save(filename='GenusSpecies')
-#GenusSpecies.save('GenusSpecies', type='h5') # Alternatively, specify the file extension. the default is .pickle
+MySpiderObjectName.save(filename='GenusSpecies')
+#MySpiderObjectName.save('GenusSpecies', type='h5') # Alternatively, specify the file extension. the default is .pickle
 ```
 
 from now on, reload the data with
 ```python
-GenusSpecies = Ct.Spider(workdir=path, voxelsize=0.001, paramspath=paramspath) 
+MySpiderObjectName = Ct.Spider(workdir=path, voxelsize=0.001, paramspath=paramspath) 
 # REMEMBER! You always have to recreate the spider object for every new file.
-GenusSpecies.load(filename='GenusSpecies', type='pickle')
+MySpiderObjectName.load(filename='GenusSpecies', type='pickle')
 ```
 
 Note that saving only save dot clouds. For the projection data you will have to compute it every time.
@@ -89,7 +89,7 @@ Now, we need to go from the provided ROIs to anatomically meaningful solids. Spe
 
 ### Orientation
 ```python
-GenusSpecies.head_SoR(flipX=False, flipZ=False, plot=False)
+MySpiderObjectName.head_SoR(flipX=False, flipZ=False, plot=False)
 ```
 
 This code takes the 7 body markers and create a new set of axis. This is:
@@ -101,13 +101,13 @@ This code takes the 7 body markers and create a new set of axis. This is:
 - Note that this function has a plot argument. This is used to check for errors in this reorientation step. Try:
 
 ```python
-GenusSpecies.head_SoR(flipX=False, flipZ=False, plot=True)
+MySpiderObjectName.head_SoR(flipX=False, flipZ=False, plot=True)
 ```
 
 If from the plot you notice some errors, you can fix it with the other two arguments. For example, if the Z axis points towards bottom rather than top, do:
 
 ```python
-GenusSpecies.head_SoR(flipX=False, flipZ=True, plot=True)
+MySpiderObjectName.head_SoR(flipX=False, flipZ=True, plot=True)
 ```
 Remember. This code saves the roto-translational matrix for the spider every time you run it. Be sure that your last run had the correct orientation.
 
@@ -115,7 +115,7 @@ Remember. This code saves the roto-translational matrix for the spider every tim
 Now, let's use the point clouds to extract relevant information for eyes and retinas.
 
 ```python
-GenusSpecies.compute_eyes()
+MySpiderObjectName.compute_eyes()
 ```
 
 The function has 2 facultative arguments, "focal_point_type" and "focal_point_position". These are used in finding the focal point of the lens, from which the retinal points will be projected in order to find the visual field.
@@ -127,20 +127,20 @@ If this happens, you can use focal_point_type='given'. In this case, the focal p
 Let's try with an example
 
 ```python
-GenusSpecies.compute_eyes(focal_point_type='given', focal_point_position=0.75)
+MySpiderObjectName.compute_eyes(focal_point_type='given', focal_point_position=0.75)
 ```
 
 ### Rotate
 Now that we have both the points and the rototranslational matrix, we can reorient all we have in order to have the spider as the center of our reference frame.
 
 ```python
-GenusSpecies.from_std_to_head()
+MySpiderObjectName.from_std_to_head()
 ```
 
 here you can again save your progress
 
 ```python
-GenusSpecies.save(filename='GenusSpecies')
+MySpiderObjectName.save(filename='GenusSpecies')
 ```
 
 Remember to recreate the object and reload if you want to restart from here
@@ -148,7 +148,7 @@ Remember to recreate the object and reload if you want to restart from here
 Let's take a moment to check our progress.
 
 ```python
-GenusSpecies.plot_matplotlib(elements=("lens", "retina"), plot_FOV_sphere=False, field_mm=5)
+MySpiderObjectName.plot_matplotlib(elements=("lens", "retina"), plot_FOV_sphere=False, field_mm=5)
 ```
 
 the field_mm argument controls some things that will come in use later. For now, it is used to determine the length of X, Y, and Z axis on the plot. Specifically, the axis are (long field_mm/2)*voxelsize. We set plot_FOV_sphere as false as for now we have not created the field of views, so it would plot only an empty sphere.
@@ -164,7 +164,7 @@ Now, we can finally use the data we collected to project the retina surface thro
 First, we project the retina towards the lens center, and hit a imaginary sphere around the spider
 
 ```python
-GenusSpecies.project_retinas_full(field_mm=150)
+MySpiderObjectName.project_retinas_full(field_mm=150)
 ```
 
 150mm is the default. This doesn't really matter exclusion made for the sake of visualization
@@ -173,7 +173,7 @@ You can now look at the projection with `GenusSpecies.plot_matplotlib(elements=(
 not very useful. Instead, we will use the following function to extract the contours of the visual field, much more usable
 
 ```python
-GenusSpecies.find_all_fields_contours_alphashape([90, 20, 20, 20])
+MySpiderObjectName.find_all_fields_contours_alphashape([90, 20, 20, 20])
 ```
 
 The code works using [alpha shapes](https://en.wikipedia.org/wiki/Alpha_shape). The argument of the function is the provided alpha. If you go too small, the shape will follow the FOV only roughly. If you go too high, you will not get a single closed shape. Start with high numbers and try. If the system throws an error, change and retry.
@@ -181,14 +181,14 @@ The code works using [alpha shapes](https://en.wikipedia.org/wiki/Alpha_shape). 
 Now you can have a look!
 
 ```python
-GenusSpecies.plot_matplotlib(elements=("FOVoutline"))
-GenusSpecies.sphericalCoordinates_plotFields() # This shows in spherical coordinates the full projection, not just contours.
+MySpiderObjectName.plot_matplotlib(elements=("FOVoutline"))
+MySpiderObjectName.sphericalCoordinates_plotFields() # This shows in spherical coordinates the full projection, not just contours.
 ```
 
 If you want to compare the full projection with the developed contours, do:
 
 ```python
-GenusSpecies.plot_matplotlib(elements=("projection_full", "FOVoutline"))
+MySpiderObjectName.plot_matplotlib(elements=("projection_full", "FOVoutline"))
 ```
 
 It may look a bit messy though. We suggest to keep on only the outline.
@@ -196,30 +196,30 @@ It may look a bit messy though. We suggest to keep on only the outline.
 Now that we have the FOV contour, we can calculate the spans for the final analysis.
 
 ```python
-GenusSpecies.sphericalCoordinates_compute(specific_discretization=15, general_discretization=36)
-GenusSpecies.binocularOverlap_compute() # to calculate the binocular overlap, mirroring each eye and seeing if they have an overlap area
-GenusSpecies.multiEyeOverlap_compute() # to calculate pairwise eye overlap.
+MySpiderObjectName.sphericalCoordinates_compute(specific_discretization=15, general_discretization=36)
+MySpiderObjectName.binocularOverlap_compute() # to calculate the binocular overlap, mirroring each eye and seeing if they have an overlap area
+MySpiderObjectName.multiEyeOverlap_compute() # to calculate pairwise eye overlap.
 ```
 
 Now we can have a look at the results!
 
 ```python
-GenusSpecies.sphericalCoordinates_plotFields()
-GenusSpecies.sphericalCoordinates_plotSorted()
+MySpiderObjectName.sphericalCoordinates_plotFields()
+MySpiderObjectName.sphericalCoordinates_plotSorted()
 ```
 
 These plots show the spherical coordinates.
 
 
 ```python
-GenusSpecies.sphericalCoordinates_plotSpans(disc='general')
-GenusSpecies.sphericalCoordinates_plotSpans(disc='specific')
+MySpiderObjectName.sphericalCoordinates_plotSpans(disc='general')
+MySpiderObjectName.sphericalCoordinates_plotSpans(disc='specific')
 ```
 
 These instead show the calculated spans! The analysis is finished! If you want to extract the data for future use, you can do:
 
 ```python
-GenusSpecies.sphericalCoordinates_save(filename='PhilaeusChrysops')
+MySpiderObjectName.sphericalCoordinates_save(filename='PhilaeusChrysops')
 ```
 
 All the files are saved in the folder specified upon object creation (workdir). 

@@ -150,6 +150,8 @@ Let's take a moment to check our progress.
 MySpiderObjectName.plot_matplotlib(elements=("lens", "retina"), plot_FOV_sphere=False, field_mm=5)
 ```
 
+![lens and retina plot](images/PhilaeusChrysopsHead.png)
+
 the field_mm argument controls some things that will come in use later. For now, it is used to determine the length of X, Y, and Z axis on the plot. Specifically, the axis are (long field_mm/2)*voxelsize. We set plot_FOV_sphere as false as for now we have not created the field of views, so it would plot only an empty sphere.
 
 Use this plot to check how lens and retina look! As well as if the orientation is correct. Note that the plot does not show all of the points, but only the ones on the surface (i.e. the convex hull)

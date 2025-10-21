@@ -22,7 +22,7 @@ path = '/path/to/foder/where/image/data/is/located/' #remember the final "/"
 paramspath = 'path/to/where/parameters/for/images/is/located/params.yaml'
 ```
 path points to where your tiff-stack is located. Check  [data_preparation.md](https://github.com/massimodeagro/ctSpyderFields/blob/main/docs/data_preparation.md) for more instructions
-params.yaml contains the color definition for importing points from image stack from AMIRA/DRAGONFLY. This is needed if the image stack presents different ROIs with different colors. Provide in the yaml the RGB value for each ROIs, giving a minimum and a maximum value (images may not be precise and especially around the edges may blur slightly with the background). An example params.yaml is provided for the structure
+params.yaml contains the color definition for importing points from image stack from AMIRA/DRAGONFLY. This is needed if the image stack presents different ROIs with different colors. Provide in the yaml the RGB value for each ROIs, giving a minimum and a maximum value (images may not be precise and especially around the edges may blur slightly with the background). An example params.yaml is provided in the data folder
 
 ```python
 labelnames = {'AME': {'Lens': 'Lens_AME', 'Retina': 'Retina_AME'},

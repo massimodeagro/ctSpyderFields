@@ -1513,7 +1513,7 @@ class Spider:
         fig, ax = plt.subplots()
         from shapely.affinity import scale
         for eye in eyes:
-            if self.eyes[eye].spherical_coordinates['polygon_amount'] == 1:
+            if self.eyes[eye].spherical_coordinates['polygons_amount'] == 1:
                 ax.fill(self.eyes[eye].spherical_coordinates['polygon'].exterior.xy[0],
                         self.eyes[eye].spherical_coordinates['polygon'].exterior.xy[1],
                         label=eye, color=self.toplot_colors[eye], alpha=0.5)
@@ -1523,7 +1523,7 @@ class Spider:
                             geom.exterior.xy[1],
                             label=eye, color=self.toplot_colors[eye], alpha=0.5)
             if binocular:
-                if self.eyes[eye].spherical_coordinates['polygon_amount'] == 1:
+                if self.eyes[eye].spherical_coordinates['polygons_amount'] == 1:
                     reverse = scale(self.eyes[eye].spherical_coordinates['polygon'], xfact=-1, yfact=1, origin=(0,0))
                     ax.fill(reverse.exterior.xy[0],
                             reverse.exterior.xy[1],

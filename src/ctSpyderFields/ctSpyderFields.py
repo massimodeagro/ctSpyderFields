@@ -646,26 +646,47 @@ class Eye:
                         tomerge.append(side)
         self.FOVcontourPoints = np.unique(np.concatenate(tomerge), axis=0)
 
-    def find_field_contours_alphashape(self, alpha, voxelsize, field_mm=150):
+    def find_field_contours_alphashape(self, alpha, voxelsize, polygons, field_mm=150):
 
         try:
             points = np.array((self.spherical_coordinates['spherical_points']['azimuth'],
                                self.spherical_coordinates['spherical_points']['elevation'])).T
             alpha_shape = alphashape.alphashape(points, alpha)
-            border_points = np.array(alpha_shape.exterior.coords)
-            self.spherical_coordinates['alphashape_points'] = border_points
+            if polygons == 0:
+                raise AlphaShapeError('need at least 1 polygon')
+            elif polygons == 1:
+                border_points = np.array(alpha_shape.exterior.coords)
+                self.spherical_coordinates['alphashape_points'] = border_points
+            else:
+                if len(alpha_shape.geoms) != polygons:
+                    raise AlphaShapeError(f'found {len(alpha_shape.geoms)} polygons. expected {polygons}')
+                else:
+                    self.spherical_coordinates['alphashape_points'] = []
+                    for geom in alpha_shape.geoms:
+                        border_points = np.array(geom.exterior.coords)
+                        self.spherical_coordinates['alphashape_points'].append(border_points)
+
             self.spherical_coordinates['polygon'] = alpha_shape
+            self.spherical_coordinates['polygons_amount'] = polygons
 
             field_vox = field_mm / voxelsize
             coords = []
             print(f'Calculating {self.EyeIdentity} FOV contour points')
-            for dot in border_points:
-                spherical_point = [field_vox, dot[0], dot[1]]
-                coords.append(self.spherical2cartesian(spherical_point))
 
+            if self.spherical_coordinates['polygons_amount'] == 1:
+                for dot in border_points:
+                    spherical_point = [field_vox, dot[0], dot[1]]
+                    coords.append(self.spherical2cartesian(spherical_point))
+            else:
+                for border_points in  self.spherical_coordinates['alphashape_points']:
+                    for dot in border_points:
+                        spherical_point = [field_vox, dot[0], dot[1]]
+                        coords.append(self.spherical2cartesian(spherical_point))
             self.FOVcontourPoints = np.array(coords)
         except AttributeError:
-            raise AlphaShapeError('could not generate a single contour. Try changing the alpha value for this eye')
+            raise AlphaShapeError('could not generate a single contour. '
+                                  'Try changing the alpha value for this eye or specify '
+                                  'the expected number of contours')
     def cartesian2spherical(self, cartesian_point):
         """
             Input:
@@ -709,7 +730,7 @@ class Eye:
             for point in tqdm(self.FOVcontourPoints):
                 spherical_points.append(self.cartesian2spherical(list(point)))
         else:
-            for point in np.array(self.StandardOrientationProjectedVectorsFull)[:, 2]:
+            for point in tqdm(np.array(self.StandardOrientationProjectedVectorsFull)[:, 2]):
                 spherical_points.append(self.cartesian2spherical(list(point)))
 
         spherical_points = np.array(spherical_points)
@@ -1094,7 +1115,9 @@ class Spider:
 
         print(" Done")        
 
-    def find_all_fields_contours_alphashape(self, alphas=[90,90,90,90]):
+    def find_all_fields_contours_alphashape(self, alphas=[90,90,90,90],
+                                            overwrite=[True, True, True, True],
+                                            polygons=[1, 1, 1, 1]):
         """
 
         :param stepsizes: the size of slices in each direction in pixels. Always need to be a 4 long list, even with less eyes
@@ -1104,8 +1127,24 @@ class Spider:
         print("Finding fields of view contours. This will take time...")
 
         for i in range(len(self.available_eyes)):
-            self.eyes[list(self.available_eyes)[i]].calculate_spherical_coordinates(full=True)
-            self.eyes[list(self.available_eyes)[i]].find_field_contours_alphashape(voxelsize=self.voxelSize, alpha=alphas[i])
+            if overwrite[i]:
+                self.eyes[list(self.available_eyes)[i]].calculate_spherical_coordinates(full=True)
+            else:
+                if len(self.eyes[list(self.available_eyes)[i]].spherical_coordinates['spherical_points']) > 0:
+                    pass
+                else:
+                    self.eyes[list(self.available_eyes)[i]].calculate_spherical_coordinates(full=True)
+            if overwrite[i]:
+                self.eyes[list(self.available_eyes)[i]].find_field_contours_alphashape(voxelsize=self.voxelSize,
+                                                                                       alpha=alphas[i],
+                                                                                       polygons=polygons[i])
+            else:
+                if len(self.eyes[list(self.available_eyes)[i]].spherical_coordinates['alphashape_points']) > 0:
+                    pass
+                else:
+                    self.eyes[list(self.available_eyes)[i]].find_field_contours_alphashape(voxelsize=self.voxelSize,
+                                                                                           alpha=alphas[i],
+                                                                                           polygons=polygons[i])
 
         print("Done")
 
@@ -1474,14 +1513,27 @@ class Spider:
         fig, ax = plt.subplots()
         from shapely.affinity import scale
         for eye in eyes:
-            ax.fill(self.eyes[eye].spherical_coordinates['polygon'].exterior.xy[0],
-                    self.eyes[eye].spherical_coordinates['polygon'].exterior.xy[1],
-                    label=eye, color=self.toplot_colors[eye], alpha=0.5)
-            if binocular:
-                reverse = scale(self.eyes[eye].spherical_coordinates['polygon'], xfact=-1, yfact=1, origin=(0,0))
-                ax.fill(reverse.exterior.xy[0],
-                        reverse.exterior.xy[1],
+            if self.eyes[eye].spherical_coordinates['polygon_amount'] == 1:
+                ax.fill(self.eyes[eye].spherical_coordinates['polygon'].exterior.xy[0],
+                        self.eyes[eye].spherical_coordinates['polygon'].exterior.xy[1],
                         label=eye, color=self.toplot_colors[eye], alpha=0.5)
+            else:
+                for geom in self.eyes[eye].spherical_coordinates['polygon'].geoms:
+                    ax.fill(geom.exterior.xy[0],
+                            geom.exterior.xy[1],
+                            label=eye, color=self.toplot_colors[eye], alpha=0.5)
+            if binocular:
+                if self.eyes[eye].spherical_coordinates['polygon_amount'] == 1:
+                    reverse = scale(self.eyes[eye].spherical_coordinates['polygon'], xfact=-1, yfact=1, origin=(0,0))
+                    ax.fill(reverse.exterior.xy[0],
+                            reverse.exterior.xy[1],
+                            label=eye, color=self.toplot_colors[eye], alpha=0.5)
+                else:
+                    for geom in self.eyes[eye].spherical_coordinates['polygon'].geoms:
+                        reverse = scale(geom, xfact=-1, yfact=1, origin=(0,0))
+                        ax.fill(reverse.exterior.xy[0],
+                                reverse.exterior.xy[1],
+                                label=eye, color=self.toplot_colors[eye], alpha=0.5)
 
         # # Azimuth vs Elevation plots
         ax.grid()

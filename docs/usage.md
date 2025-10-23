@@ -184,6 +184,14 @@ MySpiderObjectName.find_all_fields_contours_alphashape([90, 20, 20, 20])
 
 The code works using [alpha shapes](https://en.wikipedia.org/wiki/Alpha_shape). The argument of the function is the provided alpha. If you go too small, the shape will follow the FOV only roughly. If you go too high, you will not get a single closed shape. Start with high numbers and try. If the system throws an error, change and retry.
 
+In order to not recalculate successful alphashape computation, you can specify it in the function
+
+```python
+MySpiderObjectName.find_all_fields_contours_alphashape([90, 20, 20, 20], 
+                                                       overwrite=[False, True, True, True], #this will skip the first eye if already exists
+                                                       polygons=[1,1,1,1]) #here you can specify whether the field of view is split in 2. It can happen if it goes across the 180° point 
+```
+
 Now you can have a look!
 
 ```python
@@ -198,7 +206,6 @@ We suggest to keep on only the outline.
 Now that we have the FOV contour, we can calculate the spans for the final analysis.
 
 ```python
-MySpiderObjectName.sphericalCoordinates_compute() #this has the optional argument "full", to plot all points rather than just contours. Default is False
 MySpiderObjectName.sphericalCoordinates_calculateSpan() #this calculates the angular spans for each eye. it requires discretization. argument is "spans", default is 72
 MySpiderObjectName.binocularOverlap_compute() # to calculate the binocular overlap, mirroring each eye and seeing if they have an overlap area
 MySpiderObjectName.multiEyeOverlap_compute() # to calculate pairwise eye overlap.

@@ -19,29 +19,20 @@ Now, let's provide some definitions. These are specific to your machine and data
 
 ```python
 path = '/path/to/foder/where/image/data/is/located/' #remember the final "/"
-paramspath = 'path/to/where/parameters/for/images/is/located/params.yaml'
+color_paramspath = 'path/to/where/parameters/for/images/is/located/color_params.yaml'
+name_paramspath = 'path/to/where/parameters/for/images/is/located/name_params.yaml'
 ```
 path points to where your tiff-stack is located. Check  [data_preparation.md](https://github.com/massimodeagro/ctSpyderFields/blob/main/docs/data_preparation.md) for more instructions.
 
-`params.yaml` contains the color definition for importing points from image stack from AMIRA/DRAGONFLY. This is needed if the image stack presents different ROIs with different colors. Provide in the yaml the RGB value for each ROIs, giving a minimum and a maximum value (images may not be precise and especially around the edges may blur slightly with the background). An example params.yaml is provided in the data folder
+`color_params.yaml` contains the color definition for importing points from image stack from AMIRA/DRAGONFLY. This is needed if the image stack presents different ROIs with different colors. Provide in the yaml the RGB value for each ROIs, giving a minimum and a maximum value (images may not be precise and especially around the edges may blur slightly with the background). An example params.yaml is provided in the data folder
 
-```python
-labelnames = {'AME': {'Lens': 'Lens_AME', 'Retina': 'Retina_AME'},
-                  'ALE': {'Lens': 'Lens_ALE', 'Retina': 'Retina_ALE'},
-                  'PME': {'Lens': 'Lens_PME', 'Retina': 'Retina_PME'},
-                  'PLE': {'Lens': 'Lens_PLE', 'Retina': 'Retina_PLE'},
-                  'Markers': {'center': 'Marker_center',
-                              'front': 'Marker_front', 'back': 'Marker_back',
-                              'bottom': 'Marker_bottom', 'top': 'Marker_top',
-                              'left': 'Marker_left', 'right': 'Marker_right'}}
-```
-labelnames dictionary provides the name of the image stack associated with each ROI. Change them accordingly to your image naming (e.g., instead of 'Lens_AME' write 'Image_name_without_incremental_number_nor_file_type'). If the same image stack contains more than one ROI in different colors, provide the same text (e.g. {'AME': {'Lens': 'Full_AME_image_name', 'Retina': 'Full_AME_image_name'})
+`name_params.yaml` provides the name of the image stack associated with each ROI. Change them accordingly to your image naming (e.g., instead of 'Lens_AME' write 'Image_name_without_incremental_number_nor_file_type'). If the same image stack contains more than one ROI in different colors, provide the same text (e.g. AME: Lens: 'Full_AME_image_name', Retina: 'Full_AME_image_name')
 
 ## Import image stacks
 First, we create the object
 
 ```python
-MySpiderObjectName = Ct.Spider(workdir=path, label_names=labelnames, voxelsize=0.001, paramspath=paramspath) 
+MySpiderObjectName = Ct.Spider(workdir=path, voxelsize=0.001, name_paramspath=name_paramspath, color_paramspath=color_paramspath) 
 # remember to set voxelsize as given by your CT analysis software
 ```
 

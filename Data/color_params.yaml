@@ -1,0 +1,21 @@
+AME:
+  Lens: [255, 0, 255]
+  Retina: [120, 0, 120]
+ALE:
+  Lens: [0, 255, 0]
+  Retina: [0, 120, 0]
+PME:
+  Lens:  [0, 255, 255]
+  Retina: [0, 120, 120]
+PLE:
+  Lens: [0, 0, 255]
+  Retina: [0, 0, 120]
+
+Markers:
+  center: [255, 0, 0]
+  front: [255, 255, 0]
+  back: [ 120, 120, 0 ]
+  top: [ 10, 10, 10 ]
+  bottom: [ 50, 50, 50 ]
+  left: [ 50, 0, 50 ]
+  right: [ 255, 0, 120 ]

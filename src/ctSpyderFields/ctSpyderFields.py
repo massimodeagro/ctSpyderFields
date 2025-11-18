@@ -26,6 +26,9 @@ import copy
 class UnrecognizedEye(Exception):
     pass
 
+class MissingParams(Exception):
+    pass
+
 class WrongCommand(Exception):
     pass
 
@@ -44,7 +47,7 @@ class Eye:
     all the data for each eye
     """
 
-    def __init__(self, eye_identity: str, params):
+    def __init__(self, eye_identity: str, color_params):
         """
         :param eye_identity: one of AME, ALE, PME, PLE
         """
@@ -55,13 +58,16 @@ class Eye:
         # New Method | More Robust and compact
         if (eye_identity == "AME") or (eye_identity == "ALE") or (eye_identity == "PME") or (eye_identity == "PLE"):
             self.EyeIdentity = eye_identity
-            LensColor = (np.array(params[eye_identity]["Lens"]["low_color"]), np.array(params[eye_identity]["Lens"]["high_color"]))
-            RetinaColor = (np.array(params[eye_identity]["Retina"]["low_color"]), np.array(params[eye_identity]["Retina"]["high_color"]))
+            if color_params is not None:
+                lensColor = np.array(color_params[eye_identity]["Lens"])
+                self.LensColor = (lensColor-5, lensColor+5)
+                retinaColor = np.array(color_params[eye_identity]["Retina"])
+                self.RetinaColor = (retinaColor-5, retinaColor+5)
+            else:
+                self.LensColor = None
+                self.RetinaColor = None
         else:
            raise UnrecognizedEye("You inputted the wrong eye name, abort.")
-
-        self.LensColor = LensColor
-        self.RetinaColor = RetinaColor
 
         ## Slices Stacks
         self.LensMask = []  # This is created by find_lens
@@ -97,48 +103,6 @@ class Eye:
                                       'azimuth_max_spans': {},
                                       'elevation_max_spans': {}}
 
-    '''
-    def amira_find_lens_points(self, labels_pictures_list):
-        """
-        this formula takes the list of label pictures and threshold it based on
-        the given colours to find lenses
-        """
-        for label in tqdm(
-            labels_pictures_list, desc="finding " + self.EyeIdentity + " Lens"
-        ):  # for every slice
-            # find pixels with the determed color and set them as 1, all else as 0
-            self.LensMask.append(
-                cv2.inRange(label, self.LensColor[0], self.LensColor[1])
-            )
-
-        print("Computing coordinates...")
-        self.LensMask = np.array(self.LensMask)
-        self.LensPoints = np.argwhere(self.LensMask > 0)
-
-    def amira_find_retinas_points(self, labels_pictures_list):
-        """
-        this formula takes the list of label pictures and threshold it based on
-        the given colours to find retinas
-        """
-        for label in tqdm(
-            labels_pictures_list, desc="finding " + self.EyeIdentity + " Retina"
-        ):  # for every slice
-            # find pixels with the determed color and set them as 1, all else as 0
-            self.RetinaMask.append(
-                cv2.inRange(label, self.RetinaColor[0], self.RetinaColor[1])
-            )
-
-        print("Computing coordinates...")
-        self.RetinaMask = np.array(self.RetinaMask)
-        self.RetinaPoints = np.argwhere(self.RetinaMask > 0)
-
-    def amira_find_all_points(self, labels_pictures_list):
-        """
-        duh
-        """
-        self.amira_find_lens_points(labels_pictures_list)
-        self.amira_find_retinas_points(labels_pictures_list)
-    '''
 
     def find_points(self, piclist, part="Lens", style='binary'):
         if style == 'binary':
@@ -147,6 +111,9 @@ class Eye:
             elif part == "Retina":
                 self.RetinaPoints = np.argwhere(np.array(piclist) > 0)
         elif style== 'color':
+            if self.LensColor is None or self.RetinaColor is None:
+                raise MissingParams("no colors provided. can't use color mode")
+
             if part == "Lens":
                 for label in tqdm(piclist, desc="finding " + self.EyeIdentity + " Lens"):  # for every slice
                     # find pixels with the determined color and set them as 1, all else as 0
@@ -891,8 +858,8 @@ class Spider:
     def __init__(
         self,
         workdir,
-        paramspath,
-        label_names=None,
+        color_paramspath=None,
+        names_paramspath=None,
         voxelsize=0.001,
         available_eyes: list = ["AME", "ALE", "PME", "PLE"],
         eyes_toplot_colors: dict = {'AME': 'purple', 'ALE': 'darkgreen', 'PME': 'darkgoldenrod', 'PLE': 'maroon'}
@@ -908,13 +875,22 @@ class Spider:
         self.path = workdir
         self.available_eyes = available_eyes
 
-        with open(paramspath, 'r') as file:
-            self.colors = yaml.safe_load(file)
+        if color_paramspath is not None:
+            with open(color_paramspath, 'r') as file:
+                self.colors = yaml.safe_load(file)
+        else:
+            self.colors = None
+
+        if names_paramspath is not None:
+            with open(names_paramspath, 'r') as file:
+                self.LabelNames = yaml.safe_load(file)
+        else:
+            self.LabelNames = None
 
         ## New Version with a Dictionary
         self.eyes = {}
         for eye in self.available_eyes:
-            self.eyes[eye] = Eye(eye_identity=eye, params=self.colors)
+            self.eyes[eye] = Eye(eye_identity=eye, color_params=self.colors)
 
         self.cephalothoraxMarkers = {
             "center": [],
@@ -937,7 +913,6 @@ class Spider:
         }
 
         self.FullLabelPictures = []
-        self.LabelNames = label_names
 
         self.SeparateLabelPictures = {
             "AME": {"Lens": [], "Retina": []},
@@ -961,8 +936,6 @@ class Spider:
         
         self.toplot_colors = eyes_toplot_colors
 
-        self.toplot_colors = eyes_toplot_colors
-
     def load_label_split(self, labelname, group, object, style='binary'):
         """
         This function pull all the pngs from workdir and load them according to file names
@@ -978,8 +951,12 @@ class Spider:
                 imagelist.append(file)
         for file in tqdm(sorted(imagelist), desc="loading " + labelname):
             if style=='binary':
+                if self.LabelNames is None:
+                    raise MissingParams("no label names provided. can't use binary")
                 self.SeparateLabelPictures[group][object].append(cv2.imread(self.path + file, 0))
             elif style == 'color':
+                if self.colors is None:
+                    raise MissingParams("no colors param provided. can't use color")
                 self.SeparateLabelPictures[group][object].append(cv2.imread(self.path + file, 1))
 
     def load_all_labels_split(self,  style='binary'):

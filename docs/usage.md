@@ -210,6 +210,7 @@ Now that we have the FOV contour, we can calculate the spans for the final analy
 MySpiderObjectName.sphericalCoordinates_calculateSpan() #this calculates the angular spans for each eye. it requires discretization. argument is "spans", default is 72
 MySpiderObjectName.binocularOverlap_compute() # to calculate the binocular overlap, mirroring each eye and seeing if they have an overlap area
 MySpiderObjectName.multiEyeOverlap_compute() # to calculate pairwise eye overlap.
+MySpiderObjectName.fullSphereOverlap_compute() # to calculate how much of the full sphere each eye overlaps
 ```
 
 Now we can have a look at the results!
@@ -237,10 +238,16 @@ MySpiderObjectName.sphericalCoordinates_plotSpans()
 These instead show the calculated spans! The analysis is finished! If you want to extract the data for future use, you can do:
 
 ```python
-MySpiderObjectName.sphericalCoordinates_save(filename='PhilaeusChrysops')
+MySpiderObjectName.sphericalCoordinates_save(filename='GenusSpecies')
 ```
 
 All the files are saved in the folder specified upon object creation (workdir). 
+
+you can also save a report of the overlaps
+
+```python
+MySpiderObjectName.overlapsReport_save(filename='GenusSpecies')
+```
 
 
 ## Custom plotting

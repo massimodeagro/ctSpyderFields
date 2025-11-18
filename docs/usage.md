@@ -32,7 +32,9 @@ path points to where your tiff-stack is located. Check  [data_preparation.md](ht
 First, we create the object
 
 ```python
-MySpiderObjectName = Ct.Spider(workdir=path, voxelsize=0.001, name_paramspath=name_paramspath, color_paramspath=color_paramspath) 
+MySpiderObjectName = Ct.Spider(workdir=path, voxelsize=0.001, name_paramspath=name_paramspath, color_paramspath=color_paramspath,
+                               available_eyes = ["AME", "ALE", "PME", "PLE"],
+                               eyes_toplot_colors = {'AME': 'purple', 'ALE': 'darkgreen', 'PME': 'darkgoldenrod', 'PLE': 'maroon'}) 
 # remember to set voxelsize as given by your CT analysis software
 ```
 

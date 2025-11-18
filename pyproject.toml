@@ -19,5 +19,9 @@ dependencies = ["numpy==1.24.4",
 requires-python = ">=3.10"
 authors = [
   {name = "Massimo De Agro'", email = "massimo.deagro@unitn.it"},
+  {name = "Daniele Caradonna"},
+  {name = "Atal Pande"},
+  {name = "Lauren Sumner-Rooney"},
+
 ]
 readme = "README.md"

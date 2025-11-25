@@ -16,6 +16,8 @@ a single voxel. The software will use their center to reorient the spider in a k
 anatomical markers or arbitrary locations. The package will reorient the full reference frame aligning the X axis to center-front, 
 the Y axis to center-left and the Z axis to center-top.
 
+In this GitHub page, we provide an example data ROI stack, containing the ROIs for a *Philaeus chrysops* specimen. These are the ones used in the examples and plot of the docs here.
+
 ## Dragonfly
 1)	Create a separate ROI for each individual lens, retina, and cephalothorax marker. A new ROI can be created using the “segment” window on the left-hand side as seen in the figure below:
 

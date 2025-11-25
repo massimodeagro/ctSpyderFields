@@ -1,5 +1,6 @@
 ### Image processing ###
 import cv2  # computer vision 2, reads images
+from tifffile import imread as tifread #reads images if tiff
 import trimesh  # to do 3d geometry
 import alphashape
 from shapely.geometry import LineString, Point, Polygon
@@ -953,7 +954,13 @@ class Spider:
             if style=='binary':
                 if self.LabelNames is None:
                     raise MissingParams("no label names provided. can't use binary")
-                self.SeparateLabelPictures[group][object].append(cv2.imread(self.path + file, 0))
+                if os.path.splitext(file)[1].lower() in [".tif", ".tiff"]: #handle compressed binary tiffs
+                    image = tifread(self.path + file)
+                    if image.dtype == bool:
+                        image = image.astype('uint8')
+                    self.SeparateLabelPictures[group][object].append(image)
+                else:
+                    self.SeparateLabelPictures[group][object].append(cv2.imread(self.path + file, 0))
             elif style == 'color':
                 if self.colors is None:
                     raise MissingParams("no colors param provided. can't use color")

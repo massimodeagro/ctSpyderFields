@@ -22,7 +22,7 @@ path = '/path/to/foder/where/image/data/is/located/' #remember the final "/"
 color_paramspath = 'path/to/where/parameters/for/images/is/located/color_params.yaml'
 name_paramspath = 'path/to/where/parameters/for/images/is/located/name_params.yaml'
 ```
-path points to where your tiff-stack is located. Check  [data_preparation.md](https://github.com/massimodeagro/ctSpyderFields/blob/main/docs/data_preparation.md) for more instructions.
+path points to where your tiff-stack is located. Check  [data_preparation.md](https://github.com/massimodeagro/ctSpyderFields/blob/main/docs/data_preparation.md) for more instructions. Note that we provided a zip files in the Data folder with a set of binary images. you can use them here to test the package. Know that you need a lot of memory! This is a very big volume.
 
 `color_params.yaml` contains the color definition for importing points from image stack from AMIRA/DRAGONFLY. This is needed only if the image stack presents different ROIs with different colors (as per the guide reports in AMIRA, for example). Provide in the yaml the RGB value for each ROIs, giving a minimum and a maximum value (images may not be precise and especially around the edges may blur slightly with the background). An example params.yaml is provided in the data folder
 

@@ -1436,13 +1436,16 @@ class Spider:
         all_overlaps = all_overlaps.T
         all_overlaps.to_csv(self.path + filename + '_overlapsReport.csv')
 
-    def sphericalCoordinates_save(self, filename, eyes=("AME", "ALE", "PME", "PLE")):
+    def sphericalCoordinates_save(self, filename, eyes=("AME", "ALE", "PME", "PLE"), contour=False):
         eyeSummary_general_azimuth = {}
         eyeSummary_general_elevation = {}
         for eye in eyes:
             if eye in self.available_eyes:
                 spherical_points = pd.DataFrame(self.eyes[eye].spherical_coordinates['spherical_points'])
                 spherical_points.to_csv(self.path+filename+'_'+eye+'_spherical_points.csv')
+                spherical_points_outline = self.eyes[eye].spherical_coordinates['alphashape_points']:               
+                spherical_points_outline.to_csv(self.path+filename+'_'+eye+'_spherical_points_outline.csv')
+                
                 data = self.eyes[eye].spherical_coordinates['azimuth_max_spans']
                 if 'elevation_bin_min' not in list(eyeSummary_general_azimuth.keys()):
                     eyeSummary_general_azimuth['elevation_bin_min'] = np.array(data['elevation_range'])[:, 0]

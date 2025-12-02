@@ -1436,7 +1436,7 @@ class Spider:
         all_overlaps = all_overlaps.T
         all_overlaps.to_csv(self.path + filename + '_overlapsReport.csv')
 
-    def sphericalCoordinates_save(self, filename, eyes=("AME", "ALE", "PME", "PLE"), contour=False):
+    def sphericalCoordinates_save(self, filename, eyes=("AME", "ALE", "PME", "PLE")):
         eyeSummary_general_azimuth = {}
         eyeSummary_general_elevation = {}
         for eye in eyes:

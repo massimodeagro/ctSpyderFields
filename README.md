@@ -24,3 +24,7 @@ pip install git+https://github.com/massimodeagro/ctSpyderFields.git
 
 That's all folks! You can now run the examples to test the package. Sample data is available in the Data folder. Follow the guide at  [usage.md](https://github.com/massimodeagro/ctSpyderFields/blob/main/docs/usage.md).
 To work on your own data follow the guide at  [data_preparation.md](https://github.com/massimodeagro/ctSpyderFields/blob/main/docs/data_preparation.md)
+
+If you use this software, please reference it using the zenodo release: [![DOI](https://zenodo.org/badge/577233660.svg)](https://doi.org/10.5281/zenodo.18152995)
+
+

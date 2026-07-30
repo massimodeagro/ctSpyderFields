@@ -860,7 +860,7 @@ class Spider:
         self,
         workdir,
         color_paramspath=None,
-        names_paramspath=None,
+        name_paramspath=None,
         voxelsize=0.001,
         available_eyes: list = ["AME", "ALE", "PME", "PLE"],
         eyes_toplot_colors: dict = {'AME': 'purple', 'ALE': 'darkgreen', 'PME': 'darkgoldenrod', 'PLE': 'maroon'}

@@ -882,8 +882,8 @@ class Spider:
         else:
             self.colors = None
 
-        if names_paramspath is not None:
-            with open(names_paramspath, 'r') as file:
+        if name_paramspath is not None:
+            with open(name_paramspath, 'r') as file:
                 self.LabelNames = yaml.safe_load(file)
         else:
             self.LabelNames = None

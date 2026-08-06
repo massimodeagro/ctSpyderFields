@@ -1443,7 +1443,7 @@ class Spider:
             if eye in self.available_eyes:
                 spherical_points = pd.DataFrame(self.eyes[eye].spherical_coordinates['spherical_points'])
                 spherical_points.to_csv(self.path+filename+'_'+eye+'_spherical_points.csv')
-                spherical_points_outline = self.eyes[eye].spherical_coordinates['alphashape_points']
+                spherical_points_outline = pd.DataFrame(self.eyes[eye].spherical_coordinates['alphashape_points'])
                 spherical_points_outline.to_csv(self.path+filename+'_'+eye+'_spherical_points_outline.csv')
                 
                 data = self.eyes[eye].spherical_coordinates['azimuth_max_spans']

@@ -20,7 +20,7 @@ Now, let's provide some definitions. These are specific to your machine and data
 ```python
 path = '/path/to/foder/where/image/data/is/located/' #remember the final "/"
 color_paramspath = 'path/to/where/parameters/for/images/is/located/color_params.yaml'
-names_paramspath = 'path/to/where/parameters/for/images/is/located/name_params.yaml'
+name_paramspath = 'path/to/where/parameters/for/images/is/located/name_params.yaml'
 ```
 path points to where your tiff-stack is located. Check  [data_preparation.md](https://github.com/massimodeagro/ctSpyderFields/blob/main/docs/data_preparation.md) for more instructions. Note that we provided a zip files in the Data folder with a set of binary images. you can use them here to test the package. Know that you need a lot of memory! This is a very big volume.
 
@@ -32,7 +32,7 @@ path points to where your tiff-stack is located. Check  [data_preparation.md](ht
 First, we create the object
 
 ```python
-MySpiderObjectName = Ct.Spider(workdir=path, voxelsize=0.001, names_paramspath=names_paramspath, color_paramspath=color_paramspath,
+MySpiderObjectName = Ct.Spider(workdir=path, voxelsize=0.001, name_paramspath=name_paramspath, color_paramspath=color_paramspath,
                                available_eyes = ["AME", "ALE", "PME", "PLE"],
                                eyes_toplot_colors = {'AME': 'purple', 'ALE': 'darkgreen', 'PME': 'darkgoldenrod', 'PLE': 'maroon'}) 
 # remember to set voxelsize as given by your CT analysis software

@@ -1050,7 +1050,7 @@ class Spider:
             self.eyes[eye].align_to_zero()
             self.eyes[eye].find_lens_sphere(focal_point_type, focal_point_position)
             self.eyes[eye].get_lens_info()
-            print(f"{eye} sphere evaluation: {self.eyes[eye].evaluate_sphere_quality()}"
+            print(f"{eye} sphere evaluation: {self.eyes[eye].evaluate_sphere_quality()}")
             self.eyes[eye].rotate_back()
         else:
             raise(UnrecognizedEye("Unrecognized Eye: Computation aborted."))

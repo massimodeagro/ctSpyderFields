@@ -353,19 +353,26 @@ class Eye:
             radius = abs(lens_top - retina_bottom)
             self.RotatedLensSphere = radius, np.array(center)
 
-    def evaluate_sphere_quality(self):
+    def evaluate_sphere_quality(self, sigma=1):
         """
         Evaluating the goodness of fit of the sphere for 2 values:
         - surface_score:    is the lens smooth, approximating a sphere, or is it noisy?
                             in other words, how good the points lie on a sphere
         - sphericality:     is this a real sphere, or are we approximating a flat plane?
                             good to check if you would be better off using an alternative method
+        both are provided as 0 to 1.
+        for surface score, a 1 would mean that all segmented lens surface point perfectly lay on the 
+        fitted sphere surface. This is however impossible to compute in general term as voxels are discrete,
+        while the sphere is continous. We include a sigma value, that describes the best possible fit given 
+        voxel resolution. moreover, as the segmentation happens by hand, there can be inconsistencies of 
+        + or - one voxel determining the surface. for this reason sigma is set as 1 by default.
+        for sphericality, 0 is perfect approximation of a plane, while 1 is perfect approximation of a sphere.
+        it tells whether the lens is more spherical (1) or more flat (0) 
         """
 
         P = np.asarray(self.RotatedLensSurfacePoints, dtype=float)
         N = len(P)
         radius, center = self.RotatedLensSphere
-        sigma = 1 / np.sqrt(12) #estimated mimimal error given that we have discrete voxels. a perfect sphere is continous, our data is discrete
 
         # sphere residuals
         resid_s = np.linalg.norm(P - center, axis=1) - radius

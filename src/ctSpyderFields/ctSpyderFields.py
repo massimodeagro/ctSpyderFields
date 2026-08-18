@@ -353,6 +353,46 @@ class Eye:
             radius = abs(lens_top - retina_bottom)
             self.RotatedLensSphere = radius, np.array(center)
 
+    def evaluate_sphere_quality(self):
+        """
+        Evaluating the goodness of fit of the sphere for 2 values:
+        - surface_score:    is the lens smooth, approximating a sphere, or is it noisy?
+                            in other words, how good the points lie on a sphere
+        - sphericality:     is this a real sphere, or are we approximating a flat plane?
+                            good to check if you would be better off using an alternative method
+        """
+
+        P = np.asarray(self.RotatedLensSurfacePoints, dtype=float)
+        N = len(P)
+        radius, center = self.RotatedLensSphere
+        sigma = 1 / np.sqrt(12) #estimated mimimal error given that we have discrete voxels. a perfect sphere is continous, our data is discrete
+
+        # sphere residuals
+        resid_s = np.linalg.norm(P - center, axis=1) - radius
+        rms_s = float(np.sqrt(np.mean(resid_s ** 2)))
+
+        # plane residuals
+        centroid = P.mean(axis=0)
+        Q = P - centroid
+        normal = np.linalg.svd(Q, full_matrices=False)[2][-1]
+        resid_p = Q @ normal
+        rms_p = float(np.sqrt(np.mean(resid_p ** 2)))
+
+        # variance ratio
+        var_s = np.sum(resid_s ** 2) / max(N - 4, 1)
+        var_p = np.sum(resid_p ** 2) / max(N - 3, 1)
+
+        surface_score = 1.0 / (1.0 + (rms_s / sigma) ** 2)
+        sphericality = float(np.clip(1.0 - var_s / var_p, 0.0, 1.0))
+
+        return {
+            "surface_score": float(surface_score),
+            "sphericality": sphericality,
+            "combined": float(surface_score * sphericality),
+            "rms_sphere": rms_s,
+            "rms_plane": rms_p,
+        }
+
     def get_lens_info(self):
         split_plane, lens_spans, retinas_spans = self.find_split_plane()
         if split_plane == 'x+':
@@ -1010,6 +1050,7 @@ class Spider:
             self.eyes[eye].align_to_zero()
             self.eyes[eye].find_lens_sphere(focal_point_type, focal_point_position)
             self.eyes[eye].get_lens_info()
+            print(f"{eye} sphere evaluation: {self.eyes[eye].evaluate_sphere_quality()}"
             self.eyes[eye].rotate_back()
         else:
             raise(UnrecognizedEye("Unrecognized Eye: Computation aborted."))

@@ -1066,7 +1066,7 @@ class Spider:
         """
         run this! compute all eyes together
         """
-        print('Computing lenses and retina geometries...', end='')
+        print('Computing lenses and retina geometries...', end='\n')
         for n, eye in enumerate(self.available_eyes):
             if focal_point_type == 'given_different':
                 self.compute_eye(eye, focal_point_type, focal_point_position[n])

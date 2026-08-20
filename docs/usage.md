@@ -45,7 +45,7 @@ If you are using an image stack where ROIs have different colors, or in general 
 ```python
 MySpiderObjectName.load_all_labels_split(style='color')
 MySpiderObjectName.find_eyes_points(style='color')
-MySpiderObjectName.compute_cephalothorax(style='color')
+MySpiderObjectName.find_cephalothorax_points(style='color')
 ```
 
 If you are using an image stack where ROIs are all in different stacks, are white and the baground is black (0s and 1s), use

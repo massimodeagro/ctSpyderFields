@@ -1,6 +1,6 @@
 # ctSpyderFields
 Python package that project retinas through lenses as segmented from micro CT scans (Amira, Dragonfly) of spiders.
-Tested with Python=3.10
+Requires Python 3.10, 3.11 or 3.12 (the package depends on numpy 1.x, which is not available for newer Python versions).
 
 
 ## How to install the package
@@ -9,14 +9,45 @@ Tested with Python=3.10
 sudo apt install git
 ```
 
-### Create your virtual environment:
-**Step 1**: Create your virtual environment in your favorite path and activate it.
+### Option A: install with uv
+[uv](https://docs.astral.sh/uv/) manages both Python and the package dependencies, and will automatically download a compatible Python version if needed.
+
+**Step 1**: Install uv (see the [uv installation guide](https://docs.astral.sh/uv/getting-started/installation/) for Windows and other options)
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+**Step 2**: Create a virtual environment and install the `ctSpyderFields` package
+```bash
+uv venv --python 3.12
+source .venv/bin/activate
+uv pip install git+https://github.com/massimodeagro/ctSpyderFields.git
+```
+
+Alternatively, if you are already working in a uv project, add the package to it with
+```bash
+uv add git+https://github.com/massimodeagro/ctSpyderFields.git
+```
+
+To reproduce the exact environment the package was tested with, clone the repository and sync from the lockfile (`uv.lock`)
+```bash
+git clone https://github.com/massimodeagro/ctSpyderFields.git
+cd ctSpyderFields
+uv sync
+```
+
+Since we suggest using the package interactively, you can start a Jupyter notebook in the environment with
+```bash
+uv run --with jupyter jupyter lab
+```
+
+### Option B: install with pip
+**Step 1**: Create your virtual environment in your favorite path and activate it. Make sure to use Python 3.10, 3.11 or 3.12.
 ```bash
 python -m venv ~/path/to/new/virtual/environment
 source ~/path/to/new/virtual/environment/bin/activate
 ```
 
-### Install the package
 **Step 2**: Install the `ctSpyderFields` package using pip
 ```bash
 pip install git+https://github.com/massimodeagro/ctSpyderFields.git

@@ -6,6 +6,10 @@ For a guide on how to install the software go to [README.md](https://github.com/
 
 We suggest using the package in interactive mode, looking at the output of every function and plotting on the go. A good way to do so is to use Jupyter notebooks. 
 
+See here a scheme of the full pipeline
+
+![workflow](images/workflow.png)
+
 ## Load packages
 As a first step, let's load the library and other needed packages
 

@@ -10,6 +10,7 @@ See here a scheme of the full pipeline
 
 ![workflow](images/workflow.png)
 
+
 ## Load packages
 As a first step, let's load the library and other needed packages
 

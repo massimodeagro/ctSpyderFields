@@ -6,6 +6,8 @@ For a guide on how to install the software go to [README.md](https://github.com/
 
 We suggest using the package in interactive mode, looking at the output of every function and plotting on the go. A good way to do so is to use Jupyter notebooks. 
 
+If you want to follow the usage guide below with sample data, we included our original tiff-stack here in the GitHub repository, and a pre-made pickle file from the safe stack that you can find in its own Zenodo repository: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23568200.svg)](https://doi.org/10.5281/zenodo.23568200)
+
 See here a scheme of the full pipeline
 
 ![workflow](images/workflow.png)

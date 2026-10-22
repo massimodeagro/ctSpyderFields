@@ -176,7 +176,24 @@ not very useful. Instead, we will use the following function to extract the cont
 MySpiderObjectName.find_all_fields_contours_alphashape([90, 20, 20, 20])
 ```
 
-The code works using [alpha shapes](https://en.wikipedia.org/wiki/Alpha_shape). The argument of the function is the provided alpha. If you go too small, the shape will follow the FOV only roughly. If you go too high, you will not get a single closed shape. Start with high numbers and try. If the system throws an error, change and retry.
+The code works using [alpha shapes](https://en.wikipedia.org/wiki/Alpha_shape), a generalisation of the convex hull that can follow concave outlines. The argument of the function is the alpha value for each eye. Since the projected points are expressed in radians of azimuth and elevation, `1/alpha` is roughly the angular size (in radians) of the smallest detail the contour will follow: concavities narrower than that will be filled in. For example, `alpha=90` follows details down to ~0.6°, while `alpha=20` smooths over anything smaller than ~3°.
+
+- **Alpha too low**: the contour approaches the convex hull of the field and overestimates its extent in concave regions.
+- **Alpha too high**: the contour starts cutting into the field, leaving points outside or splitting into several pieces. If the number of pieces doesn't match `polygons`, an `AlphaShapeError` is raised.
+
+The expected number of polygons is 1, unless the field of view crosses the ±180° azimuth line (directly behind the spider), in which case it is split into 2 in the azimuth/elevation map and you should set `polygons=2` for that eye.
+
+After each contour is computed, the function prints diagnostics to guide the choice:
+
+```
+AME alpha shape diagnostics (alpha = 90):
+  detail scale (1/alpha): 0.64 degrees
+  polygons found: 1
+  points inside contour: 99.8%
+  contour area / convex hull area: 0.93
+```
+
+To choose alpha systematically, start from a low value (e.g. 10) and increase it. Keep the highest alpha for which the expected number of polygons is found and nearly all points (we suggest ≥99%) fall inside the contour. Over this range, the area ratio usually changes little; a sharp drop in coverage or area indicates that alpha has become too high. Eyes with sparser projections (e.g. small eyes, or coarse voxel sizes) will typically need lower alpha values. Report the alpha values used alongside your results.
 
 In order to not recalculate successful alphashape computation, you can specify it in the function
 

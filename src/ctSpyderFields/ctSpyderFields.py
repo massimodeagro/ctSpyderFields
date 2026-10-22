@@ -3,6 +3,7 @@ import cv2  # computer vision 2, reads images
 from tifffile import imread as tifread #reads images if tiff
 import trimesh  # to do 3d geometry
 import alphashape
+import shapely
 from shapely.geometry import LineString, Point, Polygon
 from shapely.affinity import scale
 from scipy.spatial import distance, minkowski_distance
@@ -683,6 +684,7 @@ class Eye:
 
             self.spherical_coordinates['polygon'] = alpha_shape
             self.spherical_coordinates['polygons_amount'] = polygons
+            self.print_alphashape_diagnostics(points, alpha_shape, alpha)
 
             field_vox = field_mm / voxelsize
             coords = []
@@ -702,6 +704,20 @@ class Eye:
             raise AlphaShapeError('could not generate a single contour. '
                                   'Try changing the alpha value for this eye or specify '
                                   'the expected number of contours')
+
+    def print_alphashape_diagnostics(self, points, alpha_shape, alpha, max_points=100000):
+        # subsample for speed, the projection can contain millions of points
+        if len(points) > max_points:
+            points = points[np.random.default_rng(0).choice(len(points), max_points, replace=False)]
+        geoms = getattr(alpha_shape, 'geoms', [alpha_shape])
+        coverage = np.mean(shapely.intersects_xy(alpha_shape, points[:, 0], points[:, 1])) * 100
+        hull_ratio = alpha_shape.area / sum(geom.convex_hull.area for geom in geoms)
+        print(f'{self.EyeIdentity} alpha shape diagnostics (alpha = {alpha}):\n'
+              f'  detail scale (1/alpha): {np.degrees(1 / alpha):.2f} degrees\n'
+              f'  polygons found: {len(geoms)}\n'
+              f'  points inside contour: {coverage:.1f}%\n'
+              f'  contour area / convex hull area: {hull_ratio:.2f}')
+
     def cartesian2spherical(self, cartesian_point):
         """
             Input:

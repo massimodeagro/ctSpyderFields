@@ -42,6 +42,9 @@ class AlphaShapeError(Exception):
 
 __version__="1.0.0"
 
+def spherical_area(polygon):
+    return shapely.transform(polygon, lambda c: np.column_stack((c[:, 0], np.sin(c[:, 1])))).area
+
 ### Classes ###
 class Eye:
     """
@@ -891,7 +894,7 @@ class Eye:
         if comparator_identity not in self.spherical_coordinates['overlaps']:
             self.spherical_coordinates['overlaps'][comparator_identity] = {}
         overlap = self.spherical_coordinates['polygon'].intersection(other_eye_data['polygon'])
-        overlap_percentage = overlap.area / self.spherical_coordinates['polygon'].area
+        overlap_percentage = spherical_area(overlap) / spherical_area(self.spherical_coordinates['polygon'])
         self.spherical_coordinates['overlaps'][comparator_identity]['overlap_percentage'] = overlap_percentage
         self.spherical_coordinates['overlaps'][comparator_identity]['overlap_object'] = overlap
 
@@ -899,7 +902,7 @@ class Eye:
         if comparator_identity not in self.spherical_coordinates['overlaps']:
             self.spherical_coordinates['overlaps'][comparator_identity] = {}
         overlap = self.spherical_coordinates['polygon'].intersection(other_eye_data['polygon'])
-        overlap_percentage = overlap.area / other_eye_data['polygon'].area
+        overlap_percentage = spherical_area(overlap) / spherical_area(other_eye_data['polygon'])
         self.spherical_coordinates['overlaps'][comparator_identity]['overlap_percentage'] = overlap_percentage
         self.spherical_coordinates['overlaps'][comparator_identity]['overlap_object'] = overlap
 
@@ -908,7 +911,7 @@ class Eye:
             self.spherical_coordinates['overlaps']['binocular'] = {}
         other_eye = scale(self.spherical_coordinates['polygon'], xfact=-1, yfact=1, origin=(0,0))
         overlap = self.spherical_coordinates['polygon'].intersection(other_eye)
-        overlap_percentage = overlap.area / self.spherical_coordinates['polygon'].area
+        overlap_percentage = spherical_area(overlap) / spherical_area(self.spherical_coordinates['polygon'])
         self.spherical_coordinates['overlaps']['binocular']['overlap_percentage'] = overlap_percentage
         self.spherical_coordinates['overlaps']['binocular']['overlap_object'] = overlap
 
